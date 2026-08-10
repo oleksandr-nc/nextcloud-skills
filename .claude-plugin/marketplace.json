@@ -1,0 +1,15 @@
+{
+    "name": "nextcloud-skills",
+    "description": "Agent Skills for working with Nextcloud: development environments, ExApp development in any language, maintenance of installed ExApps, and AppAPI operations.",
+    "owner": {
+        "name": "Nextcloud AppAPI maintainers",
+        "url": "https://github.com/oleksandr-nc/nextcloud-skills"
+    },
+    "plugins": [
+        {
+            "name": "nextcloud-skills",
+            "source": "./",
+            "description": "Skills for working with Nextcloud: dev environment setup, ExApp development in any language, fixing installed ExApps, and AppAPI operations."
+        }
+    ]
+}

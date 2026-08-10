@@ -1,0 +1,18 @@
+version = 1
+SPDX-PackageName = "nextcloud-skills"
+SPDX-PackageSupplier = "Nextcloud <https://nextcloud.com>"
+SPDX-PackageDownloadLocation = "https://github.com/oleksandr-nc/nextcloud-skills"
+
+# Files whose format cannot start with a comment header (SKILL.md must open with
+# YAML frontmatter at line 1; JSON has no comments).
+[[annotations]]
+path = [
+    "skills/nextcloud-dev-setup/SKILL.md",
+    "skills/exapp-development/SKILL.md",
+    "skills/exapp-maintenance/SKILL.md",
+    "skills/exapp-operations/SKILL.md",
+    ".claude-plugin/marketplace.json",
+    ".claude-plugin/plugin.json",
+]
+SPDX-FileCopyrightText = "2026 Nextcloud GmbH and Nextcloud contributors"
+SPDX-License-Identifier = "AGPL-3.0-or-later"

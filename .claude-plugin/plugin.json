@@ -1,0 +1,12 @@
+{
+    "name": "nextcloud-skills",
+    "displayName": "Nextcloud Skills",
+    "version": "0.1.0",
+    "description": "Skills for working with Nextcloud: dev environment setup, ExApp development in any language, fixing installed ExApps, and AppAPI operations.",
+    "author": {
+        "name": "Nextcloud AppAPI maintainers"
+    },
+    "repository": "https://github.com/oleksandr-nc/nextcloud-skills",
+    "license": "AGPL-3.0-or-later",
+    "keywords": ["nextcloud", "appapi", "exapp", "harp", "docker", "self-hosted"]
+}
