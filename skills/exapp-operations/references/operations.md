@@ -33,6 +33,9 @@ Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, o
   [fix or extend an installed ExApp](../../exapp-maintenance/references/exapp-ai-maintenance.md)
 - Reference: [ExApp manifest](../../exapp-development/references/exapp-contract.md)
 
+<!-- Editors: the section numbers below are load-bearing; sibling runbooks link these anchors (CI validates
+  them). Renumber only together with every link. -->
+
 ## Table of contents
 
 1. [What AppAPI is](#1-what-appapi-is)
@@ -489,4 +492,7 @@ in which major.
 - **HaRP**: https://github.com/nextcloud/HaRP
 - **Docker Socket Proxy** (legacy): https://github.com/nextcloud/docker-socket-proxy
 - **Admin docs**: https://docs.nextcloud.com/server/latest/admin_manual/exapps_management/
+  ([AppAPI and External Apps](https://docs.nextcloud.com/server/latest/admin_manual/exapps_management/AppAPIAndExternalApps.html),
+  [Deployment configurations](https://docs.nextcloud.com/server/latest/admin_manual/exapps_management/DeployConfigurations.html))
 - **Developer docs**: https://docs.nextcloud.com/server/latest/developer_manual/exapp_development/
+- **Known ExApps and examples**: [known-exapps.md](../../exapp-development/references/known-exapps.md)

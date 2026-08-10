@@ -80,6 +80,9 @@ AppAPI. Suggestions and contributions are welcome through issues and pull reques
 
 ## Status and support
 
+This repository is the **canonical home** of the AppAPI guides: the
+[nextcloud/app_api](https://github.com/nextcloud/app_api) repository's `AGENTS.md` points here.
+
 Maintained by the Nextcloud AppAPI maintainers; the repository is planned to move under the Nextcloud GitHub
 organization (GitHub redirects will keep existing links working). Questions and documentation problems:
 GitHub issues, answered on a best-effort basis. Security reports: see [SECURITY.md](SECURITY.md).

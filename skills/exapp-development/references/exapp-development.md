@@ -19,7 +19,7 @@ daemon `local-harp` + a manual-install daemon `manual_dev`).
 Reference implementation: [minimal_exapp](../assets/minimal_exapp/), bundled with this skill, is the whole
 contract in one framework-free Python file. Read it first; to develop in Go, Rust, Node or anything else, port
 that file. For Python, use [nc_py_api](https://github.com/cloud-py-api/nc_py_api), which implements all of this
-for you.
+for you. Real apps to read next, including a complete Go ExApp: [known-exapps.md](known-exapps.md).
 
 Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, on 2026-08-04.
 
