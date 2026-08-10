@@ -50,6 +50,8 @@ production-like Docker loop).
 - [references/exapp-development.md](references/exapp-development.md): contract, loops, redeploy semantics,
   capability map, troubleshooting.
 - [references/exapp-contract.md](references/exapp-contract.md): the `<external-app>` manifest reference.
+- [references/known-exapps.md](references/known-exapps.md): real ExApps, examples (including Go) and wrapper
+  libraries to read.
 - [assets/minimal_exapp/](assets/minimal_exapp/): runnable reference ExApp (main.py, Dockerfile, start.sh,
   appinfo/info.xml, Makefile with both loops).
 - Environment to run all this in: [nextcloud-dev-setup](../nextcloud-dev-setup/SKILL.md). Changing an app that

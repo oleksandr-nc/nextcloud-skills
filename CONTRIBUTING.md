@@ -35,7 +35,8 @@ skills/<name>/assets/         runnable material (code, templates), if any
   person's setup, and "how to verify" preferred over bare assertions.
 - **Safe**: destructive commands are marked as requiring explicit human approval.
 - **Update in the same change**: when AppAPI/HaRP behavior changes, update the affected runbook in the same
-  PR, and note the Nextcloud version if the behavior is version-specific.
+  PR, and note the Nextcloud version if the behavior is version-specific. These runbooks are the canonical
+  copy; [nextcloud/app_api](https://github.com/nextcloud/app_api) links here instead of duplicating them.
 
 ## Validation
 

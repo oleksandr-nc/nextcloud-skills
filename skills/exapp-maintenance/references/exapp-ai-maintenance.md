@@ -47,9 +47,10 @@ docker ps --filter name=nc_app_<appid>
 
 ### 2. Get the matching source
 
-The app store page (`https://apps.nextcloud.com/apps/<appid>`) and `<repository>` in the app's info.xml point
-at the source repository. Clone it and check out the tag matching the INSTALLED version from step 1 (fix what
-is running, not the moving main branch):
+The app store page (`https://apps.nextcloud.com/apps/<appid>`), the catalog in
+[known-exapps.md](../../exapp-development/references/known-exapps.md), and `<repository>` in the app's
+info.xml point at the source repository. Clone it and check out the tag matching the INSTALLED version from
+step 1 (fix what is running, not the moving main branch):
 
 ```bash
 git clone <repo> && cd <repo> && git checkout v<installed-version>    # tag scheme varies by project
