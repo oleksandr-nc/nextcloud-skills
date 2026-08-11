@@ -45,6 +45,10 @@ Run all of this inside a disposable Linux VM (or an equivalent isolated box) tha
 
 Everything below assumes a shell inside that sandbox.
 
+**On a Mac**, read [macos.md](macos.md) first: it covers which setup to choose (native engine, a Linux VM, or
+a remote host), the Docker socket path, why `DOMAIN_SUFFIX` should not stay `.local`, and which ExApp images
+exist for Apple Silicon. The stages below then apply unchanged.
+
 ## Stage 1: clone and bootstrap
 
 Goal: nextcloud-docker-dev checked out, `.env` generated, Nextcloud server source and app_api cloned.
@@ -72,11 +76,12 @@ Verify:
 ```bash
 grep -E "COMPOSE_PROJECT_NAME|DOMAIN_SUFFIX|PROTOCOL" .env
 test -d workspace/server/apps-extra/app_api && echo app_api-cloned
-getent hosts nextcloud.local
+python3 -c "import socket; print(socket.gethostbyname('nextcloud.local'))"
 ```
 
 Expected: `COMPOSE_PROJECT_NAME=master`, `DOMAIN_SUFFIX=.local`, `PROTOCOL=http`; `app_api-cloned`;
-`nextcloud.local` resolving to localhost (getent may print the `::1` row, the `127.0.0.1` row, or both).
+`nextcloud.local` resolving to a loopback address (`127.0.0.1`). An unresolvable name raises
+`socket.gaierror`. (The resolution check is written in Python because `getent` does not exist on macOS.)
 
 If it fails:
 - `nextcloud.local` does not resolve: re-run `./scripts/update-hosts` with sudo, or set up the dnsmasq wildcard.
@@ -149,7 +154,7 @@ services:
       HP_TRUSTED_PROXY_IPS: "192.168.21.0/24"   # DOCKER_SUBNET from .env
       HP_LOG_LEVEL: "info"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKER_SOCKET-/var/run/docker.sock}:/var/run/docker.sock
       - harp-certs:/certs
 
 volumes:
