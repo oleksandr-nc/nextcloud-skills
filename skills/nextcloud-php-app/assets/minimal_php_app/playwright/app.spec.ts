@@ -9,6 +9,10 @@
 
 import { expect, test } from '@playwright/test'
 
+// OC is a global Nextcloud injects into every page; it has no TypeScript declaration.
+// Playwright transpiles specs without typechecking, so this only matters if you run tsc.
+declare const OC: { generateUrl: (path: string) => string, requestToken: string }
+
 const USER = process.env.NEXTCLOUD_USER ?? 'admin'
 const PASSWORD = process.env.NEXTCLOUD_PASSWORD ?? 'admin'
 

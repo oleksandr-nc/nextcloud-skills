@@ -43,6 +43,10 @@ a passing browser test suite.
   autoloads.
 - **`curl` against your own routes needs `-H 'OCS-APIRequest: true'`**, otherwise even a GET is rejected with
   `412 CSRF check failed`, which looks like an auth problem and is not.
+- **Rename the reference app with its `rename.sh`, not by hand.** A migration's class name contains neither
+  the app id nor the namespace, so hand renames fatal on install; display strings are a third set again.
+- Executed migrations are recorded in `oc_migrations` by `(app, version)`: **editing one does nothing**, for
+  ever. Add a new file, or force it with `occ migrations:execute <appid> <version>`.
 - A new migration file runs when you **re-enable the app** (`occ app:disable X && occ app:enable X`),
   with or without a version bump. Bump `<version>` for shipping, so running instances apply it on upgrade.
 - Inject the current user as `$userId` (lowercase); `$UserId` is a deprecated alias.

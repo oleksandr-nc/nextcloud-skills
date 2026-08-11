@@ -44,25 +44,19 @@ environment, `custom_apps/` on a typical server.
 ```bash
 cp -r <skills-repo>/skills/nextcloud-php-app/assets/minimal_php_app <apps-dir>/<app_id>
 cd <apps-dir>/<app_id>
-rm -rf node_modules test-results playwright-report      # local build artefacts, if the copy had any
-
-# Rename every identifier. All three substitutions are needed: the app id, the PHP
-# namespace, and the class names built from it.
-grep -rIl 'minimal_php_app\|MinimalPhpApp' . --exclude-dir=node_modules | xargs sed -i \
-    -e 's/minimal_php_app/<app_id>/g' \
-    -e 's/MinimalPhpApp/<Namespace>/g'
-
-# Then rename the files whose names carry identifiers, and the class inside the migration:
-mv lib/Migration/Version1100Date20260811120000.php lib/Migration/Version1000Date<YmdHis>.php
-mv playwright/app.spec.ts playwright/<app_id>.spec.ts   # optional, but keeps greps honest
-
-# Nothing of the original may remain:
-grep -rn 'minimal\|MinimalPhp' . --exclude-dir=node_modules       # must print nothing
+sh rename.sh <app_id> <Namespace> "<Display Name>"
 ```
 
-That last grep is the point of the exercise. A rename that misses one identifier produces an app that
-installs happily and misbehaves later: a database table or index still carrying the reference app's name, or
-a navigation route pointing at a controller that no longer exists.
+Use the script rather than a search-and-replace of your own. Renaming this app by hand is the most
+error-prone step in the whole skill, because the identifiers live in three different places: file contents,
+file **names**, and a **PHP class name that contains neither the app id nor the namespace**. Miss that last
+one and `occ app:enable` dies with `Cannot declare class ... because the name is already in use`; miss the
+display strings and your app installs, works, and is called "Minimal PHP App" in the app menu, on its pages
+and in the settings list.
+
+The script does all of it, then refuses to finish unless the result is clean: no reference-app strings
+anywhere, and every migration class name equal to its filename. It leaves three `TODO` markers in
+`appinfo/info.xml` (`<description>`, `<author>`, `<bugs>`) for you to fill in.
 
 Then enable it:
 
@@ -206,13 +200,30 @@ That works with or without a version bump (verified: adding a migration to an ap
 1.1.0 and re-enabling it created the new index). Bump `<version>` in `info.xml` when you **ship**, because
 that is what makes an already-running instance apply the migration on upgrade.
 
-Guard the schema change with `hasTable()` so re-running the step is harmless, and add an index on every
-column you filter by. Index and table names are limited to 30 characters including the `oc_` prefix, so long
+**Executed migrations are remembered, so editing one changes nothing.** Nextcloud records each step as
+`(app, version)` in the `oc_migrations` table and skips anything already recorded, no matter what the file
+now contains. Re-enabling the app reports success while your schema stays stale, which is a genuinely
+confusing failure while iterating on a first migration. Either give the change a **new file** with a
+lexically greater version string, or force the recorded one to run again:
+
+```bash
+occ migrations:execute <appid> <version>     # e.g. 1000Date20260811150000
+```
+
+It prints nothing on success; confirm with the schema export below. Renaming a table this way also leaves the
+old table behind: nothing cleans it up for you.
+
+Guard every schema change so re-running the step is harmless, and match the guard to the change: `hasTable()`
+before creating a table, and `getTable(...)->hasColumn(...)` before adding a column to an existing one. A
+later migration that adds a column passes `hasTable()` trivially and would try to add the column twice. Add
+an index on every column you filter by. Index and table names are limited to 30 characters including the `oc_` prefix, so long
 app ids force abbreviations; pick names that survive a global search-and-replace when the app is renamed.
 
 **The entity** extends `OCP\AppFramework\Db\Entity`. Column `user_id` becomes property `$userId` with
 generated `getUserId()`/`setUserId()`; declare those in `@method` annotations so tooling understands them,
-and call `addType()` in the constructor so values come back as `int` rather than numeric strings.
+and call `addType()` in the constructor so values come back as `int` or `bool` rather than strings. Booleans
+work the same way: `Types::BOOLEAN` in the migration plus `addType('pinned', 'boolean')` round-trips to JSON
+`true`/`false`.
 
 **The mapper** extends `QBMapper` and builds queries with the query builder. Bind every value with
 `createNamedParameter()`; never concatenate user input into SQL. The table name you pass to the mapper and
@@ -225,8 +236,9 @@ works but has been a deprecated alias since Nextcloud 26.
 Verify:
 
 ```bash
-# the table exists, with its columns and indexes, without needing a database client
-occ db:schema:export | grep -A20 "oc_<appid>_<table>"
+# the table exists, with its columns and indexes, without needing a database client.
+# The export prints ~13 lines per column, so ask for enough context to see them all.
+occ db:schema:export | grep -A60 "oc_<appid>_<table>"
 # create and list through the API
 curl -u <user>:<pass> -H 'OCS-APIRequest: true' -H 'Content-Type: application/json' \
     -X POST "<nextcloud-url>/index.php/apps/<appid>/api/items" -d '{"title":"first item"}'
@@ -238,8 +250,10 @@ controller's validation runs.
 
 If it fails:
 
-- **Table missing**: you did not re-enable the app after adding the migration. Run
-  `occ app:disable <appid> && occ app:enable <appid>`, then re-check `occ db:schema:export`.
+- **Table missing**: in order of likelihood: you did not re-enable the app after adding the migration
+  (`occ app:disable <appid> && occ app:enable <appid>`); you **edited an already-executed migration** instead
+  of adding a new one (see the ledger note above); or the migration's class name does not match its filename,
+  in which case `occ app:enable` fataled and the app is half-installed.
 - **`Class not found`**: the migration's namespace must match `OCA\<Namespace>\Migration`.
 - **A property with no matching column** is silently ignored when writing.
 - **A column with no matching entity property is the opposite of silent**, and it is the one that actually

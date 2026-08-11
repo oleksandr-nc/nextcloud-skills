@@ -53,20 +53,18 @@ The suite logs in through the real form, so it needs a user; it defaults to `adm
 
 ## Renaming it for your own app
 
-Two substitutions plus two file renames cover everything. Run them from inside your copy:
-
 ```bash
-rm -rf node_modules test-results playwright-report
-grep -rIl 'minimal_php_app\|MinimalPhpApp' . --exclude-dir=node_modules | xargs sed -i \
-    -e 's/minimal_php_app/<app_id>/g' -e 's/MinimalPhpApp/<Namespace>/g'
-mv lib/Migration/Version1100Date20260811120000.php lib/Migration/Version1000Date<YmdHis>.php
-mv playwright/app.spec.ts playwright/<app_id>.spec.ts
-grep -rn 'minimal\|MinimalPhp' . --exclude-dir=node_modules      # must print nothing
+sh rename.sh <app_id> <Namespace> "<Display Name>"
+# example: sh rename.sh snippetbox SnippetBox "Snippet Box"
 ```
 
-What those two substitutions actually reach, so you can check the result: the directory name, `<id>`,
-`<namespace>`, the navigation route and settings class names in `info.xml`; every PHP namespace and class
-reference; the **database table name** (`minimal_php_app_items`) in both the migration and the mapper; the
-**index name**; the `data-testid` values and URLs in the templates, JavaScript and specs; and `name` in
-`package.json`. The migration class name is inside the file as well as in its filename, which is why the
-`mv` is followed by the final grep.
+Do not do this by hand. The identifiers live in file contents, in file names, and in a migration **class
+name that contains neither the app id nor the namespace** - miss that one and `occ app:enable` fatals with
+`Cannot declare class ...`. Display strings ("Minimal PHP App", the summary, the author, the bugs URL) are a
+separate set again, and missing them gives you a working app called "Minimal PHP App" in the app menu.
+
+The script renames identifiers, display strings, the migration file and its class, the spec file and the
+table and index names (shortened to fit the 30-character limit), resets the version to 1.0.0, deletes this
+README and itself, and then **fails** unless the result is clean: no reference-app strings left, and every
+migration class name equal to its filename. It leaves `TODO` markers in `appinfo/info.xml` for
+`<description>`, `<author>` and `<bugs>`.
