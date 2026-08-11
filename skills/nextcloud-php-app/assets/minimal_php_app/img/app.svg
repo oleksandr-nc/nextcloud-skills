@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  - SPDX-FileCopyrightText: 2026 Nextcloud GmbH and Nextcloud contributors
+  - SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+	<path d="M8 1 1 4.5v7L8 15l7-3.5v-7L8 1zm0 1.7 5 2.5v5.6L8 13.3l-5-2.5V5.2l5-2.5z"/>
+</svg>

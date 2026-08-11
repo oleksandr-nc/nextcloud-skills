@@ -1,0 +1,15 @@
+{
+    "name": "minimal_php_app",
+    "version": "1.0.0",
+    "description": "Minimal Nextcloud PHP app used by the nextcloud-php-app skill",
+    "license": "AGPL-3.0-or-later",
+    "private": true,
+    "scripts": {
+        "playwright": "playwright test",
+        "playwright:ui": "playwright test --ui",
+        "playwright:install": "playwright install chromium"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.62.1"
+    }
+}

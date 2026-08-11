@@ -143,8 +143,9 @@ def main() -> int:
     for skill_dir in skill_dirs:
         check_skill(skill_dir)
 
+    skip_dirs = {"LICENSES", ".git", "node_modules", "test-results", "playwright-report"}
     for md_file in sorted(ROOT.rglob("*.md")):
-        if "LICENSES" in md_file.parts or ".git" in md_file.parts:
+        if skip_dirs.intersection(md_file.parts):
             continue
         check_links(md_file)
 
