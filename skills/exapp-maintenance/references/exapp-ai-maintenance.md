@@ -179,3 +179,5 @@ instance through exactly steps 4 to 7.
 - [operations.md](../../exapp-operations/references/operations.md):
   [lifecycle command semantics](../../exapp-operations/references/operations.md#6-exapp-lifecycle-occ) and
   [operations troubleshooting](../../exapp-operations/references/operations.md#10-troubleshooting-symptom-first).
+- [ai-stack.md](../../nextcloud-ai-stack/references/ai-stack.md): operating the AI apps this runbook's worked
+  example belongs to, including why a provider's task types appear only after init finishes.

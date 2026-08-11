@@ -11,6 +11,8 @@ path = [
     "skills/exapp-development/SKILL.md",
     "skills/exapp-maintenance/SKILL.md",
     "skills/exapp-operations/SKILL.md",
+    "skills/harp-operations/SKILL.md",
+    "skills/nextcloud-ai-stack/SKILL.md",
     ".claude-plugin/marketplace.json",
     ".claude-plugin/plugin.json",
 ]
