@@ -143,11 +143,94 @@ The `<route>` value is `appid.controller.method` with the controller name lowerc
 the menu is rendered client-side, so a missing entry there can mean a rendering problem rather than a
 registration problem.
 
+### Calling your own API from the command line
+
+A browser sends the CSRF token automatically; `curl` does not. Without it every request, **including GET**,
+is rejected with HTTP `412` and `{"message":"CSRF check failed"}`. Add the header that marks the request as
+an API call:
+
+```bash
+curl -u <user>:<pass> -H 'OCS-APIRequest: true' "<nextcloud-url>/index.php/apps/<appid>/api/items"
+```
+
+This is the single most confusing failure when testing a new route by hand, because it looks like an
+authentication problem and is not.
+
 ## Stage 2: prove it in a browser
 
 Server-side checks cannot see a script that never loaded, a CSP violation, or a page that renders empty.
 Continue with [php-app-ui-testing.md](php-app-ui-testing.md), which sets up Playwright against a real
-instance and ships four starter tests.
+instance. Add a test per stage from here on; the reference app's suite grows the same way.
+
+## Stage 3: store data
+
+Three pieces: a migration that creates the table, an entity that maps a row, and a mapper that queries it.
+See `lib/Migration/`, `lib/Db/` and `lib/Controller/ItemController.php` in the reference app.
+
+**The migration** is a class under `lib/Migration/` named `Version<version>Date<YmdHis>`, where `<version>`
+is the app version without dots. Nextcloud runs pending migrations when the **installed app version
+changes**, so bump `<version>` in `info.xml` and then:
+
+```bash
+occ app:disable <appid> && occ app:enable <appid>
+```
+
+Guard the schema change with `hasTable()` so re-running the step is harmless, and add an index on every
+column you filter by.
+
+**The entity** extends `OCP\AppFramework\Db\Entity`. Column `user_id` becomes property `$userId` with
+generated `getUserId()`/`setUserId()`; declare those in `@method` annotations so tooling understands them,
+and call `addType()` in the constructor so values come back as `int` rather than numeric strings.
+
+**The mapper** extends `QBMapper` and builds queries with the query builder. Bind every value with
+`createNamedParameter()`; never concatenate user input into SQL.
+
+**In the controller**, inject the current user as `private ?string $userId` (lowercase). `$UserId` still
+works but has been a deprecated alias since Nextcloud 26.
+
+Verify:
+
+```bash
+# the table exists (adjust for your database)
+occ db:convert-type --help >/dev/null && echo "use your DB client to check oc_<appid>_<table>"
+# create and list through the API
+curl -u <user>:<pass> -H 'OCS-APIRequest: true' -H 'Content-Type: application/json' \
+    -X POST "<nextcloud-url>/index.php/apps/<appid>/api/items" -d '{"title":"first item"}'
+curl -u <user>:<pass> -H 'OCS-APIRequest: true' "<nextcloud-url>/index.php/apps/<appid>/api/items"
+```
+
+Expected: `201` with the created row, then a list containing it. A `400` for an empty title proves the
+controller's validation runs.
+
+If it fails:
+
+- **Table missing**: the app version was not bumped, so no migration ran. Check `occ app:list` shows the new
+  version.
+- **`Class not found`**: the migration's namespace must match `OCA\<Namespace>\Migration`.
+- **Column mapping surprises**: entity properties are camelCase of the snake_case column; a property with no
+  matching column is silently ignored on write.
+
+## Stage 4: settings
+
+Two classes and a template: a **section** (`IIconSection`) is the entry in the settings list, a **settings**
+class (`ISettings`) is the form inside it, and both are registered in `info.xml`:
+
+```xml
+<settings>
+    <admin>OCA\MinimalPhpApp\Settings\AdminSettings</admin>
+    <admin-section>OCA\MinimalPhpApp\Settings\AdminSection</admin-section>
+</settings>
+```
+
+Pass values to the frontend with `IInitialState::provideInitialState()` rather than printing them into the
+template: the frontend reads them as parsed JSON, and nothing lands in the HTML. Store configuration with
+`IAppConfig` (`getValueString`, `setValueString`), which is the supported replacement for the old
+`IConfig::getAppValue` calls.
+
+Personal settings work identically with `<personal>` and `<personal-section>`.
+
+Verify: open `<nextcloud-url>/index.php/settings/admin/<appid>`; the section appears in the left-hand list
+and the form renders. The reference app asserts exactly that in its Playwright suite.
 
 ## Related
 

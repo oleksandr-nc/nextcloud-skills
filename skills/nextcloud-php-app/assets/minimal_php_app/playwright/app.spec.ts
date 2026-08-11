@@ -75,3 +75,29 @@ test('the app produces no errors of its own', async ({ page }) => {
 
 	expect(errors).toEqual([])
 })
+
+test('the admin settings section renders', async ({ page }) => {
+	await page.goto('settings/admin/minimal_php_app')
+
+	await expect(page.getByTestId('admin-section')).toBeVisible()
+	await expect(page.getByText('Admin settings rendered by an ISettings implementation.')).toBeVisible()
+})
+
+test('the data API stores and returns an item', async ({ page }) => {
+	// request.post() from the page context reuses the session cookie, and Playwright
+	// sends the CSRF token that the browser already has.
+	const title = `playwright ${Date.now()}`
+	await page.goto('apps/minimal_php_app/')
+
+	const created = await page.evaluate(async (t) => {
+		const response = await fetch(OC.generateUrl('/apps/minimal_php_app/api/items'), {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', requesttoken: OC.requestToken },
+			body: JSON.stringify({ title: t }),
+		})
+		return { status: response.status, body: await response.json() }
+	}, title)
+
+	expect(created.status).toBe(201)
+	expect(created.body.title).toBe(title)
+})

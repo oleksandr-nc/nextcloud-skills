@@ -11,7 +11,7 @@
 	<description><![CDATA[Reference app for the nextcloud-php-app skill. It is the smallest app that still
 shows every moving part: an app id, a bootstrap class, a navigation entry, a page rendered from a template,
 and a JSON API route. Copy it and grow it.]]></description>
-	<version>1.0.0</version>
+	<version>1.1.0</version>
 	<licence>agpl</licence>
 	<author>Nextcloud AppAPI maintainers</author>
 	<namespace>MinimalPhpApp</namespace>
@@ -20,6 +20,10 @@ and a JSON API route. Copy it and grow it.]]></description>
 	<dependencies>
 		<nextcloud min-version="33" max-version="35"/>
 	</dependencies>
+	<settings>
+		<admin>OCA\MinimalPhpApp\Settings\AdminSettings</admin>
+		<admin-section>OCA\MinimalPhpApp\Settings\AdminSection</admin-section>
+	</settings>
 	<navigations>
 		<navigation>
 			<id>minimal_php_app</id>

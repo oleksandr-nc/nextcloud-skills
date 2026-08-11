@@ -41,6 +41,10 @@ a passing browser test suite.
 - **Inline `<script>` is blocked** by the Content Security Policy. Behaviour goes in a file.
 - The app id, the `<namespace>` in `info.xml` and the `OCA\<Namespace>` PHP namespace must agree, or nothing
   autoloads.
+- **`curl` against your own routes needs `-H 'OCS-APIRequest: true'`**, otherwise even a GET is rejected with
+  `412 CSRF check failed`, which looks like an auth problem and is not.
+- Migrations run when the **app version changes**: bump `<version>`, then disable and enable the app.
+- Inject the current user as `$userId` (lowercase); `$UserId` is a deprecated alias.
 - Nextcloud caches app metadata: after changing `info.xml`, disable and enable the app rather than wondering
   why a navigation entry did not appear.
 - In the browser, the app menu is a **popover** whose entries are anchors with `role="menuitem"`, not links.
