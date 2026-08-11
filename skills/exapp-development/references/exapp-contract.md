@@ -14,7 +14,7 @@ Parsing lives in `ExAppService::getAppInfo()` (`lib/Service/ExAppService.php`); 
 `lib/Service/ExAppRouteHelper.php` (paths refer to the [nextcloud/app_api](https://github.com/nextcloud/app_api)
 sources). Invalid route definitions abort registration with a descriptive error.
 
-Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, on 2026-08-10.
+Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, on 2026-08-11.
 
 ## The element tree
 
@@ -89,7 +89,9 @@ Enforcement happens in two places, depending on the path a request takes:
 - **HaRP path** (browser to `/exapps/...`): AppAPI hands HaRP the route table (url + access_level +
   bruteforce_protection) via the ExApp metadata endpoint, and HaRP resolves the caller's level per request
   through the user-info endpoint (no/disabled user = PUBLIC, admin = ADMIN, else USER), enforcing the
-  comparison itself. `verb` and `headers_to_exclude` are not part of the HaRP checks.
+  comparison itself. `verb` and `headers_to_exclude` are not part of the HaRP checks. Observed replies: an
+  anonymous request to a `USER` or `ADMIN` route gets `403` (an admin session or basic auth gets through), an
+  undeclared path gets `404`, and the lifecycle endpoints (`/heartbeat`, `/init`, `/enabled`) get `502`.
 - **PHP proxy path** (`/index.php/apps/app_api/proxy/...`): `ExAppProxyController` matches `url` (regex) and
   `verb`, enforces the access level, strips `headers_to_exclude`, and applies bruteforce throttling on the
   listed status codes.
@@ -106,8 +108,14 @@ the JSON-in-text form shown above.
 - `occ app_api:app:register --env NAME=VALUE` overrides **only declared names**; undeclared `--env` values are
   **silently dropped**. If the manifest has no `<environment-variables>` block at all, every `--env` is
   ignored.
-- Variables whose final value is an empty string are not passed to the container at all.
-- The surviving set is stored and replayed on `app:update` (no need to repeat `--env`).
+- Variables whose final value is an empty string are not passed to the container at all (verified for both a
+  missing `<default>` element and `--env NAME=`).
+- **Never write an empty `<default></default>` or `<default/>`**: it does not mean "empty string". The empty
+  element parses to an empty array, survives the empty-value filter in `ExAppService::getAppInfo()`, and the
+  variable reaches the container as the literal string `Array` (verified on AppAPI 35.0.0-dev.1). Omit the
+  element entirely to leave a variable unset.
+- The surviving set is stored and replayed on `app:update` (which has no `--env`/`--mount` options of its own);
+  to change a value, re-register the app.
 
 So "my `--env` did nothing" almost always means the variable is not declared in the manifest.
 

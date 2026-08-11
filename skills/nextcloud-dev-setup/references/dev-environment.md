@@ -306,7 +306,7 @@ This is the acceptance gate for the environment. Continue with
 | Instance misbehaves after changes | `docker compose restart nextcloud`, then `./scripts/occ.sh nextcloud -- maintenance:repair` if needed |
 | HaRP wedged | `docker compose restart appapi-harp` (safe; ExApp frpc clients retry and reconnect) |
 | One service's config drifted | `docker compose up -d --force-recreate <service>` (containers are disposable; volumes hold state) |
-| Failed ExApp install left a container behind | `./scripts/occ.sh nextcloud -- app_api:app:unregister <appid>` (add `--rm-data` to also drop its data volume) |
+| Failed ExApp install left a container behind | `./scripts/occ.sh nextcloud -- app_api:app:unregister <appid> --force` (`--force` because unregister first tries to disable the app, which fails when it is unreachable; add `--rm-data` to also drop its data volume) |
 | Full reset (DESTROYS all instances' data) | Requires explicit human approval: `docker compose down -v`, then re-run from Stage 2 |
 
 ## Troubleshooting (symptom first)

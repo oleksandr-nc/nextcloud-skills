@@ -21,7 +21,7 @@ contract in one framework-free Python file. Read it first; to develop in Go, Rus
 that file. For Python, use [nc_py_api](https://github.com/cloud-py-api/nc_py_api), which implements all of this
 for you. Real apps to read next, including a complete Go ExApp: [known-exapps.md](known-exapps.md).
 
-Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, on 2026-08-04.
+Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, on 2026-08-11.
 
 ## Mental model
 
@@ -173,11 +173,15 @@ The mechanics behind the Makefile, for any language:
    In the JSON form values are typed (`access_level`: 0=PUBLIC, 1=USER, 2=ADMIN). `host`/`protocol` keys are
    ignored; the daemon provides them (`manual_dev` points at `host.docker.internal`), the JSON provides the port.
 3. Iterate: edit code, restart the process (stop it by its exact PID or Ctrl-C, then start it again).
-   Re-register only when the manifest changes (routes, version).
+   Re-register only when the manifest changes (routes, version). Verified: the app answers again immediately
+   after a restart, with no re-registration and the same secret.
 4. Browser/API access for manual apps goes through the PHP proxy:
    `http://nextcloud.local/index.php/apps/app_api/proxy/<appid>/<path>` (the `/exapps/` path is served by HaRP
    and returns 404 for apps on plain manual daemons).
-5. Clean up: `app_api:app:unregister <appid>`.
+5. Clean up: `app_api:app:unregister <appid>` **while the app is still running**. Unregistering disables the
+   app first, which is a call to your `/enabled` endpoint, so if you stopped the process already the first
+   unregister fails (exit 1) and leaves the app registered but `[disabled]`; a second run then succeeds. Use
+   `app_api:app:unregister <appid> --force` to remove a stopped app in one command.
 
 ## Loop 2 (production-like): docker-install through HaRP
 
@@ -239,13 +243,14 @@ lifecycle handlers are `nc_py_api/ex_app/integration_fastapi.py`.
 
 | Symptom | Cause and fix |
 |---|---|
-| Install fails: "heartbeat check failed", app left `[disabled]` with container running | No frpc tunnel (image lacks start.sh/frpc), app listening on TCP instead of the unix socket in HaRP mode, or shared-key mismatch. `docker logs nc_app_<appid>`: you want "login to server success ... start proxy success" from frpc, then your own listen line. |
+| Install fails: "heartbeat check failed", app left `[disabled]` with container running | No frpc tunnel (image lacks start.sh/frpc), app listening on TCP instead of the unix socket in HaRP mode, shared-key mismatch, or the Nextcloud URL has no working `/exapps/` proxy rule (AppAPI polls `<nextcloud_url>/exapps/<appid>/heartbeat`; see [operations.md Step 4](../../exapp-operations/references/operations.md#2-quickstart-zero-to-a-working-exapp)). `docker logs nc_app_<appid>`: you want "login to server success ... start proxy success" from frpc, then your own listen line. |
 | Deploy aborts: `POST .../images/create ... 500` | Image only exists locally and no `registry ... to local` mapping on the daemon. |
 | Deploy aborts instantly: "Connection refused for URI https://..." | Daemon registered `https` against HaRP's http port; re-register the daemon with `http`. |
 | My rebuilt image is not what runs | You did not bump the version (`app:update` no-ops on same version), or no registry-to-local mapping so the registry copy was pulled. |
 | ExApp gets 401 calling OCS | Missing/empty `EX-APP-VERSION`, wrong secret (did you restart a manual app with a different `APP_SECRET` than registered?), or the app is disabled and the path is not exempt. |
 | `/exapps/<appid>/<path>` 404 | Route not declared in the manifest (or app on a manual daemon: use the PHP proxy path). |
-| Register hangs forever | The app was not running/reachable before `--wait-finish` (manual-install), or `/init` never reports 100 and no error: check your status PUTs; the init watchdog only times out after ~40 minutes. |
+| Register hangs forever | The app was not running/reachable before `--wait-finish` (manual-install), or `/init` never reports 100 and no error: check your status PUTs; the init watchdog only times out after ~40 minutes. Killing the `occ` client does not stop it: the PHP process keeps polling inside the Nextcloud container until it finishes or is killed there. |
+| `app:register` says "is already registered" right after an unregister | The unregister failed (see the fast-loop cleanup note) and `--silent` hid it. Re-run with `--force`. |
 | `PUT /ex-app/status` returns 401 while initializing | Only allowed while install/update is in progress or app enabled; report init progress promptly. |
 
 More: [dev-environment.md](../../nextcloud-dev-setup/references/dev-environment.md) troubleshooting

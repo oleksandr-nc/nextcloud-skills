@@ -47,8 +47,9 @@ Special topologies have their own runbooks, same directory:
   `HP_SHARED_KEY`.
 - `daemon:register` is a silent no-op when a daemon with that name exists; `daemon:unregister` first to change
   anything.
-- Green daemon checks do not prove the browser path: ExApp UIs also need the `/exapps/` reverse-proxy rule
-  (with WebSocket upgrade).
+- Green daemon checks do not prove the ExApp path. Without a working `/exapps/` reverse-proxy rule (with
+  WebSocket upgrade) no ExApp can even be installed on a HaRP daemon: AppAPI polls the heartbeat at
+  `<nextcloud_url>/exapps/<appid>`, so the install fails while `DaemonCheck` stays green.
 - Never paste real secrets into shared files or commands you log; placeholders in the runbooks are in angle
   brackets.
 - Destructive flags need explicit human approval: `app:unregister --rm-data` deletes the app's data volume.

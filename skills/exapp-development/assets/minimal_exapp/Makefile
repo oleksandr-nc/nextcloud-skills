@@ -31,7 +31,7 @@ run:
 	NEXTCLOUD_URL=$${NEXTCLOUD_URL:-http://nextcloud.local} python3 main.py
 
 register-manual:
-	$(OCC) app_api:app:unregister $(APP_ID) --silent || true
+	$(OCC) app_api:app:unregister $(APP_ID) --force --silent || true
 	$(OCC) app_api:app:register $(APP_ID) $(DAEMON_MANUAL) --json-info '$(JSON_INFO)' --wait-finish
 
 build:
@@ -41,7 +41,7 @@ build:
 register-docker:
 	$(OCC) app_api:daemon:registry:add $(DAEMON_DOCKER) --registry-from example.local --registry-to local || true
 	docker cp appinfo/info.xml $(NEXTCLOUD_CONTAINER):/tmp/$(APP_ID)-info.xml
-	$(OCC) app_api:app:unregister $(APP_ID) --silent || true
+	$(OCC) app_api:app:unregister $(APP_ID) --force --silent || true
 	$(OCC) app_api:app:register $(APP_ID) $(DAEMON_DOCKER) --info-xml /tmp/$(APP_ID)-info.xml --wait-finish
 
 update-docker:

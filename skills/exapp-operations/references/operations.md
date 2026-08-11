@@ -22,7 +22,8 @@ For building the ExApp side, start at
 developers can use the sibling project **nc_py_api** (`cloud-py-api/nc_py_api`), which implements the ExApp
 contract for you.
 
-Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, on 2026-08-10.
+Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, plus a released AppAPI 34
+(NC34) and 33 (NC33) for the version notes, on 2026-08-11.
 
 **Detailed runbooks** live next to this file and in the sibling skills of this repository:
 
@@ -144,10 +145,13 @@ docker run -d \
 > host prefer `-p 127.0.0.1:8780:8780` and reach `8782` over the internal Docker network, or firewall both
 > ports so they are never on a public interface. Do not set `HP_FRP_DISABLE_TLS` on an untrusted network.
 
-**Step 4. Route `/exapps/` to HaRP on your Nextcloud reverse proxy.** Browsers reach ExApp frontends directly
-through HaRP (bypassing PHP; required for WebSockets/streaming). On whatever proxy already terminates TLS for
-Nextcloud, forward `/exapps/` to HaRP `:8780`. **The daemon checks and Test deploy in Step 6 pass without this
-rule**, but ExApp UIs and WebSocket endpoints will be unreachable from the browser.
+**Step 4. Route `/exapps/` to HaRP on your Nextcloud reverse proxy.** On whatever proxy already terminates TLS
+for Nextcloud, forward `/exapps/` to HaRP `:8780`. Browsers reach ExApp frontends through this rule (bypassing
+PHP; required for WebSockets/streaming), **and so does AppAPI itself**: on a HaRP daemon it addresses the ExApp
+as `<nextcloud_url>/exapps/<appid>` (`DockerActions::resolveExAppUrl()`), so the install-time `/heartbeat` poll,
+`/init` and `/enabled` all travel this same public path. **Without this rule no ExApp can be installed**: the
+container deploys, then the install fails with "heartbeat check failed" and the app is left `[disabled]`. Do not
+use the Step 6 checks to decide whether this rule works: they stay green without it (verified).
 
 nginx:
 
@@ -205,8 +209,9 @@ occ app_api:daemon:list
 In the UI, open **Settings --> Administration --> AppAPI** and use **Check connection** and **Test deploy**
 (the latter installs and removes a real test ExApp, exercising image pull + run, not just connectivity).
 The admin setup checks `DaemonCheck` (daemon reachable, default set) and `HarpVersionCheck` (HaRP new enough)
-should be green. Note: green checks confirm the internal Nextcloud-to-HaRP path only; the **browser** path
-still needs the `/exapps/` proxy rule from Step 4.
+should be green. Note: both report success even when the Step 4 rule is missing (verified on an instance where
+no ExApp could install), because they only exercise the Nextcloud-to-daemon path. **Test deploy** is the check
+that covers the full path, so it is the one that fails when Step 4 is missing or wrong.
 
 **Step 7. Install an ExApp.** Browse installable ExApps in the UI store (**Settings --> Administration -->
 AppAPI**) or at https://apps.nextcloud.com/ to find its id; there is no `occ` command
@@ -375,9 +380,15 @@ There are **no** occ commands for the App Store; it is code-only under `lib/Fetc
 ## 9. Runtime and the ExApp contract
 
 ```
-Browser --> Nextcloud reverse proxy (/exapps/*) --> HaRP (:8780) --> FRP tunnel --> ExApp container
+Browser ----.
+             `--> Nextcloud reverse proxy (/exapps/*) --> HaRP (:8780) --> FRP tunnel --> ExApp container
+AppAPI (PHP) '     (AppAPI uses the same public URL: <nextcloud_url>/exapps/<appid>)
 ```
 
+- On a HaRP daemon AppAPI reaches the ExApp through that **public** URL as well
+  (`DockerActions::resolveExAppUrl()` returns `<nextcloud_url>/exapps/<appid>`): the install-time `/heartbeat`
+  poll, `/init` and `/enabled` are ordinary requests through the Quickstart Step 4 proxy rule, not an internal
+  shortcut. This is why a missing `/exapps/` rule blocks installation, not just browser access.
 - Nextcloud-to-daemon calls send the `harp-shared-key` header; ExApp URLs are under `/exapps/app_api/...`
   (`HarpService::initGuzzleClient()`; `getHarpSharedKey()` decrypts the key stored, encrypted, in
   `deploy_config['haproxy_password']`).
@@ -437,8 +448,13 @@ of this contract in any language, with a reference app:
 - **Fixed the key/host but nothing changed?** `app_api:daemon:register` is a no-op when a daemon with that
   `name` already exists (it prints "Registration skipped ..." and exits 0, so `--set-default` is skipped too).
   Run `occ app_api:daemon:unregister <name>` first, then re-register.
-- **ExApp installed and `[enabled]`, but its page is blank / WebSocket fails**: the `/exapps/` reverse-proxy
-  rule (Quickstart Step 4) is missing. The daemon checks pass without it because they use the internal path.
+- **Every ExApp install fails with "heartbeat check failed" (HaRP daemon)**: the `/exapps/` reverse-proxy rule
+  (Quickstart Step 4) is missing or points at the wrong host/port, so AppAPI cannot reach
+  `<nextcloud_url>/exapps/<appid>/heartbeat`. `DaemonCheck` and `HarpVersionCheck` stay green in this state, so
+  probe the path itself: `curl -o /dev/null -w '%{http_code}' <nextcloud-url>/exapps/app_api/info` returns `401`
+  when it reaches HaRP, `404` when it falls through to Nextcloud, `502` when the rule points nowhere.
+- **ExApp page loads but WebSockets/streaming fail**: the `/exapps/` rule is missing the `Upgrade`/`Connection`
+  headers (Apache additionally needs `mod_proxy_wstunnel`).
 - **ExApp will not deploy**: image pull failing (registry/network). Check `docker ps -a` for `nc_app_*`, the
   ExApp container logs, and HaRP logs; a private registry needs `app_api:daemon:registry:add`.
 - **HaRP not routing / 502**: wrong `--harp_frp_address`/port (default `8782` not reachable), or the reverse
