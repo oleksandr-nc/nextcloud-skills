@@ -60,6 +60,9 @@ Special topologies have their own runbooks, same directory:
   references, operating notes, app store, runtime contract, troubleshooting, version notes.
 - [references/kubernetes.md](references/kubernetes.md), [references/remote-daemon.md](references/remote-daemon.md),
   [references/aio.md](references/aio.md): topology runbooks.
+- The HaRP service itself (probes, logs, upgrades, load):
+  [harp-operations](../harp-operations/SKILL.md). AI features on top of AppAPI:
+  [nextcloud-ai-stack](../nextcloud-ai-stack/SKILL.md).
 - Building the app side of the contract: [exapp-development](../exapp-development/SKILL.md). Changing an
   installed app: [exapp-maintenance](../exapp-maintenance/SKILL.md). Local dev environment:
   [nextcloud-dev-setup](../nextcloud-dev-setup/SKILL.md).

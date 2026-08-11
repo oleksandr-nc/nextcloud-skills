@@ -28,7 +28,8 @@ Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, p
 **Detailed runbooks** live next to this file and in the sibling skills of this repository:
 
 - Operations: [Kubernetes](kubernetes.md), [ExApps on a separate host](remote-daemon.md),
-  [Nextcloud AIO](aio.md)
+  [Nextcloud AIO](aio.md), [HaRP itself](../../harp-operations/references/harp-operations.md),
+  [the AI stack](../../nextcloud-ai-stack/references/ai-stack.md)
 - Development: [set up a dev environment](../../nextcloud-dev-setup/references/dev-environment.md),
   [develop ExApps in any language](../../exapp-development/references/exapp-development.md),
   [fix or extend an installed ExApp](../../exapp-maintenance/references/exapp-ai-maintenance.md)

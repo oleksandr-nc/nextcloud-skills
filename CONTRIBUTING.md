@@ -28,7 +28,12 @@ skills/<name>/assets/         runnable material (code, templates), if any
 
 - **Verified, not plausible**: only write down what was executed against a real environment. Every runbook
   carries a `Last verified against:` line (Nextcloud, AppAPI, HaRP versions and the date); update it when you
-  re-verify.
+  re-verify. Reviewing a runbook does not count as verifying it: three review passes over these pages missed
+  claims that a single afternoon of execution disproved.
+- **Turn load-bearing claims into checks**: when a sentence would cost someone hours if it were wrong, add a
+  check for it to [`tests/verify.py`](tests/README.md) so it can be re-proven instead of re-read.
+- **Report what you find upstream**: executing a runbook regularly uncovers real bugs. Fix the runbook here,
+  then open an issue on the affected project with the reproduction you already have.
 - **Executable by an agent**: imperative voice, stages in order, and a Verify block (command + expected
   output) after every stage. Troubleshooting is symptom-first tables.
 - **Portable**: no real secrets ever (placeholders in angle brackets), no values that only exist in one
@@ -43,7 +48,11 @@ skills/<name>/assets/         runnable material (code, templates), if any
 ```bash
 python3 scripts/validate_skills.py    # frontmatter + internal links (CI runs this)
 pip install reuse && reuse lint       # licensing headers (CI runs this)
+python3 tests/verify.py --all         # the claims themselves, against a live instance (CI cannot)
 ```
+
+The first two check structure, the third checks reality; see [tests/README.md](tests/README.md) for the
+environment variables that point it at your instance.
 
 ## Commits and licensing
 

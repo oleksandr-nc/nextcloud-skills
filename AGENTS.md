@@ -17,6 +17,8 @@ read its `SKILL.md` first; it tells you what to read next and the rules that mat
 | "Write an ExApp" (any language), "port my service to Nextcloud", "my ExApp will not deploy/authenticate" | [skills/exapp-development/SKILL.md](skills/exapp-development/SKILL.md) |
 | "App X is broken on my Nextcloud, fix it", "add capability Y to installed app X" | [skills/exapp-maintenance/SKILL.md](skills/exapp-maintenance/SKILL.md) |
 | "Install AppAPI/HaRP on my server", "register a daemon (Docker/Kubernetes/remote host/AIO)", "manage or troubleshoot ExApps with occ" | [skills/exapp-operations/SKILL.md](skills/exapp-operations/SKILL.md) |
+| "HaRP returns 401/403/404/502/503", "ExApps unreachable although the containers run", "tune, upgrade or debug HaRP itself" | [skills/harp-operations/SKILL.md](skills/harp-operations/SKILL.md) |
+| "Set up AI on my Nextcloud", "the Assistant offers nothing", "my AI task never finishes", "which app provides which task type", "GPU or CPU" | [skills/nextcloud-ai-stack/SKILL.md](skills/nextcloud-ai-stack/SKILL.md) |
 
 Building an ExApp but nothing is set up yet? Do [nextcloud-dev-setup](skills/nextcloud-dev-setup/SKILL.md)
 first; exapp-development assumes a working environment exists.

@@ -25,10 +25,14 @@ frontmatter fields are used.
 | [exapp-development](skills/exapp-development/SKILL.md) | Write an ExApp in **any language** against the raw AppAPI contract, with a runnable framework-free reference app and two iteration loops |
 | [exapp-maintenance](skills/exapp-maintenance/SKILL.md) | Fix or extend an ExApp that is already installed: clone matching sources, patch, rebuild the image, redeploy in place without losing data |
 | [exapp-operations](skills/exapp-operations/SKILL.md) | Install and operate AppAPI and ExApps with occ on Docker, Kubernetes, remote hosts or AIO, and troubleshoot symptom-first |
+| [harp-operations](skills/harp-operations/SKILL.md) | Run and debug HaRP itself: probes, configuration, log decoding, certificates, upgrades and load-related failures |
+| [nextcloud-ai-stack](skills/nextcloud-ai-stack/SKILL.md) | Install, verify and debug Nextcloud's AI features: Assistant, Task Processing and the provider apps behind them, local or external |
 
 Every runbook was executed end to end against a live environment before being written down, and carries a
-"Last verified against" line naming the Nextcloud, AppAPI and HaRP versions it was checked with. The content
-is maintained alongside AppAPI and updated as AppAPI evolves.
+"Last verified against" line naming the Nextcloud, AppAPI and HaRP versions it was checked with. The
+load-bearing claims are also executable: [`tests/verify.py`](tests/README.md) replays them against a live
+instance, so a skill can be re-proven rather than re-read. The content is maintained alongside AppAPI and
+updated as AppAPI evolves.
 
 ## Using the skills
 
@@ -65,7 +69,9 @@ their usual way.
 ```
 skills/<name>/SKILL.md        the entry point: when to use, how to work, the critical facts
 skills/<name>/references/     the full runbooks the skill executes from
-skills/<name>/assets/         runnable material (e.g. the minimal_exapp reference application)
+skills/<name>/assets/         runnable material (reference app, diagnostic scripts)
+tests/verify.py               replays each skill's load-bearing claims against a live instance
+scripts/validate_skills.py    structure, links, anchors and the verified-against promise
 ```
 
 `SKILL.md` is deliberately short; agents read the referenced runbooks when they actually execute the task
@@ -75,8 +81,8 @@ troubleshooting tables, so an agent can execute them unaided and a human can fol
 ## Roadmap
 
 Planned additions, in no particular order: an nc_py_api (Python ExApp) quickstart, Task Processing (AI
-provider) development, Talk bots, developing app_api itself, and instance-administration topics beyond
-AppAPI. Suggestions and contributions are welcome through issues and pull requests.
+provider) development, Talk bots, ExApp UI integration, and backup, restore and daemon migration.
+Suggestions and contributions are welcome through issues and pull requests.
 
 ## Status and support
 
