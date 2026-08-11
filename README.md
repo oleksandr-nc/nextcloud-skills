@@ -64,6 +64,14 @@ Clone the repository (or fetch single files raw from GitHub) and point your agen
 them. Tools that support the Agent Skills format natively can install the `skills/<name>` directories in
 their usual way.
 
+### Recommended: give your agent a browser
+
+Several skills verify user interfaces. An agent without a browser can only fetch HTML, which cannot show
+whether a script ran, whether the Content Security Policy blocked it, or what a component actually rendered.
+An MCP browser server (`chrome-devtools-mcp`, or `@playwright/mcp`) fixes that, and its accessibility
+snapshots hand you the roles and accessible names that test locators need. Setup, verified:
+[dev-environment.md, Stage 8](skills/nextcloud-dev-setup/references/dev-environment.md#stage-8-optional-give-the-agent-a-browser).
+
 ## Repository anatomy
 
 ```

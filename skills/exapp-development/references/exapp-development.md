@@ -229,6 +229,7 @@ the map of where to read, with the reference implementation next to each:
 
 | You want | Read | nc_py_api reference |
 |---|---|---|
+| Verifying any of this in a browser | drive the page with an MCP browser server and read the accessibility tree, then keep the check as a test: [dev-environment.md Stage 8](../../nextcloud-dev-setup/references/dev-environment.md#stage-8-optional-give-the-agent-a-browser) and [php-app-ui-testing.md](../../nextcloud-php-app/references/php-app-ui-testing.md) | - |
 | Files menu entries, top menu pages, UI scripts/styles | tech_details/api UI pages of the [ExApp developer docs](https://docs.nextcloud.com/server/latest/developer_manual/exapp_development/); live example: `tests/exapp_integration/test_file_actions_menu.py` in the app_api repository (AppAPI API v2 over `ocs/v1.php`: `POST .../api/v2/ui/files-actions-menu`) | `nc_py_api/ex_app/ui/` |
 | AI Task Processing providers (text, image, ...) | TaskProcessing section of the developer docs; a real provider: [llm2](https://github.com/nextcloud/llm2) | `nc_py_api/ex_app/providers/task_processing.py` |
 | occ commands, event listeners, webhooks, notifications, Talk bots | tech_details/api pages | `nc_py_api/ex_app/` per-topic modules |

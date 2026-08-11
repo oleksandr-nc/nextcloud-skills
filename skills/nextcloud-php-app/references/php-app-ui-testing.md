@@ -78,6 +78,36 @@ Two options, and the `PLAYWRIGHT_BASE_URL` override is what makes both work from
   `createRandomUser()` reach into the managed container with `docker exec`, so they only work against a
   container the run itself started.
 
+## Two ways to use a browser, and you want both
+
+Playwright drives a real browser, but **nobody looks at the page**: you write assertions and get pass or
+fail. That is what you want for regression tests, and it is the wrong tool for finding out why a locator
+matches nothing.
+
+The complement is a browser the agent can drive interactively, through an MCP browser server such as
+`chrome-devtools-mcp` ([set-up in the dev-setup skill](../../nextcloud-dev-setup/references/dev-environment.md#stage-8-optional-give-the-agent-a-browser)).
+It returns the page's **accessibility tree**, which is the same information a locator needs:
+
+```
+menu "Apps"
+  menuitem "Minimal PHP App"
+```
+
+That single snapshot answers the question that costs a debugging round otherwise: the app-menu entries are
+`menuitem`, not `link`. Every trap in the section below was discovered the slow way and would have been
+visible instantly here.
+
+So the workflow is **explore live, then freeze**:
+
+1. Drive the page with the browser tool: navigate, log in, click, snapshot.
+2. Read the roles and accessible names from the snapshot.
+3. Write the Playwright locator from what you saw, and keep it as a test.
+
+Step 3 is what makes it durable. An interactive session ends; a spec keeps checking forever.
+
+If your agent has no browser tool, the fallback is the throwaway spec at the end of this page that prints
+`outerHTML`. It works, it is just slower.
+
 ## Logging in
 
 Nextcloud has no test-only login shortcut, so drive the real form. It is also the honest thing to do: it

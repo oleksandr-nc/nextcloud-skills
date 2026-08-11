@@ -54,6 +54,8 @@ a passing browser test suite.
   why a navigation entry did not appear.
 - In the browser, the app menu is a **popover** whose entries are anchors with `role="menuitem"`, not links.
   Both facts silently break the obvious Playwright locators.
+- Give the agent a real browser (an MCP browser server) before writing locators: the accessibility snapshot
+  hands you roles and accessible names directly, and both traps above become obvious.
 
 ## Files
 

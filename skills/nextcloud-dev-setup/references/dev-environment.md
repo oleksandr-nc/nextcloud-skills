@@ -18,7 +18,8 @@ hosts and AIO have their own runbooks: [kubernetes.md](../../exapp-operations/re
 [remote-daemon.md](../../exapp-operations/references/remote-daemon.md),
 [aio.md](../../exapp-operations/references/aio.md).
 
-Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, nextcloud-docker-dev df4ca69, on 2026-08-04.
+Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, nextcloud-docker-dev df4ca69,
+on 2026-08-04; Stage 8 with chrome-devtools-mcp 1.7.0 on 2026-08-11.
 
 ## If you are an AI agent, read this first
 
@@ -295,6 +296,64 @@ second endpoint proves the ExApp can call Nextcloud OCS APIs).
 This is the acceptance gate for the environment. Continue with
 [exapp-development.md](../../exapp-development/references/exapp-development.md); clean up with
 `make -C <skills-repo>/skills/exapp-development/assets/minimal_exapp unregister` when done.
+
+## Stage 8 (optional): give the agent a browser
+
+Goal: the agent can look at a rendered page instead of guessing from HTML.
+
+This is optional for the environment and close to essential for UI work, on ExApps and PHP apps alike. An
+agent without a browser verifies a page by fetching HTML and reasoning about it, which cannot see whether a
+script executed, whether the Content Security Policy blocked it, or what a Vue component actually rendered.
+
+Run a headless Chrome with remote debugging, and point an MCP browser server at it:
+
+```bash
+chromium --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
+    --remote-debugging-address=0.0.0.0 --remote-debugging-port=9222 &
+npm install -g chrome-devtools-mcp
+```
+
+Then declare the server for your agent. For Claude Code that is `.mcp.json` in the project root; other tools
+have their own equivalent, and the server itself is tool-agnostic:
+
+```json
+{
+    "mcpServers": {
+        "chrome-devtools": {
+            "type": "stdio",
+            "command": "chrome-devtools-mcp",
+            "args": ["--browserUrl", "http://localhost:9222"]
+        }
+    }
+}
+```
+
+Attaching to an already-running browser (`--browserUrl`) is what suits a VM or container: the browser is a
+long-lived service you can restart independently. The server can also launch its own browser if you leave
+that flag out.
+
+Verify:
+
+```bash
+curl -s http://localhost:9222/json/version
+```
+
+Expected: JSON naming the browser and protocol version. Then ask the agent to open a Nextcloud page and take
+a snapshot; it should come back with the accessibility tree rather than raw HTML.
+
+Why it earns its place: the snapshot reports each element's **role and accessible name**, which is exactly
+what a Playwright locator needs. Opening the Nextcloud app menu returns
+
+```
+menu "Apps"
+  menuitem "Minimal PHP App"
+```
+
+so the fact that app-menu entries are `menuitem` and not `link` is visible immediately, instead of costing a
+debugging round against a correct app. The working pattern is: **explore with the browser, then freeze what
+you learned into a test** ([php-app-ui-testing.md](../../nextcloud-php-app/references/php-app-ui-testing.md)).
+
+Alternatives exist (`@playwright/mcp` is the other common one); this stage documents the setup verified here.
 
 ## Daily operation
 
