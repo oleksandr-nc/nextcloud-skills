@@ -53,7 +53,7 @@ class Version1100Date20260811120000 extends SimpleMigrationStep {
 
 		$table->setPrimaryKey(['id']);
 		// Index the column you filter on. Without it every list query is a full scan.
-		$table->addIndex(['user_id'], 'min_php_app_items_uid');
+		$table->addIndex(['user_id'], 'minimal_php_app_items_uid');
 
 		return $schema;
 	}

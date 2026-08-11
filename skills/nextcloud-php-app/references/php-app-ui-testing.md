@@ -12,7 +12,7 @@ running Nextcloud.
 Playwright is where Nextcloud is heading: the server ships `playwright.config.ts` next to its older Cypress
 setup, and apps including activity, circles, text, twofactor_totp and viewer already use it.
 
-Last verified against: Nextcloud master (35), Playwright 1.62.1, Node 22, on 2026-08-11 (4 tests, all
+Last verified against: Nextcloud master (35), Playwright 1.62.1, Node 22, on 2026-08-11 (6 tests, all
 passing against a live instance).
 
 ## Setup
@@ -52,6 +52,17 @@ npm run playwright:install          # downloads the browser, about 115 MB, once
 PLAYWRIGHT_BASE_URL=<nextcloud-url> npm run playwright
 ```
 
+Both installs are one-time. `node_modules/` is not tracked in this repository, so a fresh clone always needs
+them; a copy taken from a checkout where the suite has already run may carry them along and start instantly.
+
+`OC` is a global that Nextcloud injects into the page, and it has no TypeScript declaration. Playwright
+transpiles specs without typechecking, so `OC.generateUrl(...)` runs fine either way, but add a declaration if
+you run `tsc` over your tests:
+
+```ts
+declare const OC: { generateUrl: (path: string) => string, requestToken: string }
+```
+
 Keeping `/index.php/` in `baseURL` is what allows specs to navigate to `apps/<appid>/` instead of repeating
 the prefix everywhere.
 
@@ -85,9 +96,9 @@ test.beforeEach(async ({ page }) => {
 For a large suite, do this once in a `setup` project and reuse the saved `storageState`, the way the server's
 own suite does.
 
-## The four starter tests
+## The starter tests
 
-They are in [playwright/app.spec.ts](../assets/minimal_php_app/playwright/app.spec.ts) and each one covers a
+Six of them, in [playwright/app.spec.ts](../assets/minimal_php_app/playwright/app.spec.ts); each covers a
 failure the previous layer cannot see.
 
 1. **The template renders**: asserts the heading and static text. Catches a controller returning the wrong
@@ -98,6 +109,24 @@ failure the previous layer cannot see.
 3. **The navigation entry is reachable**: opens the app menu and finds the entry.
 4. **The app produces no errors of its own**: no uncaught exceptions, and no failing HTTP request belonging to
    this app.
+5. **The admin settings section renders**: proves the `ISettings` and section registration in `info.xml`
+   actually resolve, which nothing server-side tells you.
+6. **The data API stores a row**: performs an authenticated `POST` from inside the page with
+   `page.evaluate()`, so the browser's own session and CSRF token are used:
+
+   ```ts
+   const created = await page.evaluate(async (t) => {
+       const response = await fetch(OC.generateUrl('/apps/<appid>/api/items'), {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json', requesttoken: OC.requestToken },
+           body: JSON.stringify({ title: t }),
+       })
+       return { status: response.status, body: await response.json() }
+   }, title)
+   ```
+
+   This is the browser-side counterpart of the `OCS-APIRequest` header that `curl` needs: inside the page you
+   already have a session, so you send the CSRF token instead.
 
 ## Four traps that make a correct app look broken
 

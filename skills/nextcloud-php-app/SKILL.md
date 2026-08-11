@@ -43,7 +43,8 @@ a passing browser test suite.
   autoloads.
 - **`curl` against your own routes needs `-H 'OCS-APIRequest: true'`**, otherwise even a GET is rejected with
   `412 CSRF check failed`, which looks like an auth problem and is not.
-- Migrations run when the **app version changes**: bump `<version>`, then disable and enable the app.
+- A new migration file runs when you **re-enable the app** (`occ app:disable X && occ app:enable X`),
+  with or without a version bump. Bump `<version>` for shipping, so running instances apply it on upgrade.
 - Inject the current user as `$userId` (lowercase); `$UserId` is a deprecated alias.
 - Nextcloud caches app metadata: after changing `info.xml`, disable and enable the app rather than wondering
   why a navigation entry did not appear.
@@ -57,4 +58,5 @@ a passing browser test suite.
 - [references/php-app-ui-testing.md](references/php-app-ui-testing.md): Playwright setup, the four starter
   tests, debugging, and the locator traps.
 - [assets/minimal_php_app/](assets/minimal_php_app/): the reference app, including its Playwright suite.
+  Its [README](assets/minimal_php_app/README.md) has the rename checklist; read it before copying.
 - A development instance to run all this against: [nextcloud-dev-setup](../nextcloud-dev-setup/SKILL.md).

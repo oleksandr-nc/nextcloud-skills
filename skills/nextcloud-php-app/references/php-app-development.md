@@ -30,32 +30,56 @@ Three names must agree: the **app id** (`minimal_php_app`), the `<namespace>` in
 (`MinimalPhpApp`), and the PHP namespace (`OCA\MinimalPhpApp`). Classes under `lib/` autoload from that
 namespace; a mismatch produces "class not found" with no other clue.
 
+The `<namespace>` tag is authoritative (`AppManager::getAppNamespace()`); without it the server derives one
+by upper-casing the first letter of the app id, which would give the unusable `Minimal_php_app`. That is why
+every multi-word app id needs the tag. Within it you are free: `linkstash` may declare either `Linkstash` or
+`LinkStash`, as long as the PHP namespace matches exactly.
+
 ## Stage 1: scaffold and install
 
-Copy the reference app and rename it, rather than assembling files by hand:
+Copy the reference app and rename it, rather than assembling files by hand. `<apps-dir>` is any directory on
+the instance's app path: `apps-extra/` in a [nextcloud-docker-dev](../../nextcloud-dev-setup/SKILL.md)
+environment, `custom_apps/` on a typical server.
 
 ```bash
-cp -r <skills-repo>/skills/nextcloud-php-app/assets/minimal_php_app <apps-dir>/<your_app_id>
+cp -r <skills-repo>/skills/nextcloud-php-app/assets/minimal_php_app <apps-dir>/<app_id>
+cd <apps-dir>/<app_id>
+rm -rf node_modules test-results playwright-report      # local build artefacts, if the copy had any
+
+# Rename every identifier. All three substitutions are needed: the app id, the PHP
+# namespace, and the class names built from it.
+grep -rIl 'minimal_php_app\|MinimalPhpApp' . --exclude-dir=node_modules | xargs sed -i \
+    -e 's/minimal_php_app/<app_id>/g' \
+    -e 's/MinimalPhpApp/<Namespace>/g'
+
+# Then rename the files whose names carry identifiers, and the class inside the migration:
+mv lib/Migration/Version1100Date20260811120000.php lib/Migration/Version1000Date<YmdHis>.php
+mv playwright/app.spec.ts playwright/<app_id>.spec.ts   # optional, but keeps greps honest
+
+# Nothing of the original may remain:
+grep -rn 'minimal\|MinimalPhp' . --exclude-dir=node_modules       # must print nothing
 ```
 
-`<apps-dir>` is any directory on the instance's app path: `apps-extra/` in a
-[nextcloud-docker-dev](../../nextcloud-dev-setup/SKILL.md) environment, `custom_apps/` on a typical server.
+That last grep is the point of the exercise. A rename that misses one identifier produces an app that
+installs happily and misbehaves later: a database table or index still carrying the reference app's name, or
+a navigation route pointing at a controller that no longer exists.
 
 Then enable it:
 
 ```bash
-occ app:enable minimal_php_app
-occ app:list | grep minimal_php_app
+occ app:enable <app_id>
+occ app:list | grep <app_id>
 ```
 
 Verify:
 
 ```bash
 # The page: 401 (or a redirect) means the route exists and is protected. 404 means it is not registered.
-curl -s -o /dev/null -w "%{http_code}\n" "<nextcloud-url>/index.php/apps/minimal_php_app/"
+curl -s -o /dev/null -w "%{http_code}\n" "<nextcloud-url>/index.php/apps/<app_id>/"
 
 # The API route, authenticated:
-curl -s -u <user>:<pass> "<nextcloud-url>/index.php/apps/minimal_php_app/api/whoami"
+curl -s -u <user>:<pass> -H 'OCS-APIRequest: true' \
+    "<nextcloud-url>/index.php/apps/<app_id>/api/whoami"
 
 # The navigation entry, from the server's own list rather than the rendered page:
 curl -s -u <user>:<pass> -H 'OCS-APIRequest: true' \
@@ -167,23 +191,33 @@ instance. Add a test per stage from here on; the reference app's suite grows the
 Three pieces: a migration that creates the table, an entity that maps a row, and a mapper that queries it.
 See `lib/Migration/`, `lib/Db/` and `lib/Controller/ItemController.php` in the reference app.
 
-**The migration** is a class under `lib/Migration/` named `Version<version>Date<YmdHis>`, where `<version>`
-is the app version without dots. Nextcloud runs pending migrations when the **installed app version
-changes**, so bump `<version>` in `info.xml` and then:
+**The migration** is a class under `lib/Migration/` named `Version<n>Date<YmdHis>`, where `<n>` is a
+zero-padded encoding of the app version (`1.0.0` becomes `1000`, `1.1.0` becomes `1100`). Nextcloud only
+orders migrations lexically by that string; it never compares it to `<version>` in `info.xml`.
+
+**A new migration file does not run by itself.** Loading a page or running `occ` will not pick it up. What
+runs pending migrations immediately is re-enabling the app:
 
 ```bash
 occ app:disable <appid> && occ app:enable <appid>
 ```
 
+That works with or without a version bump (verified: adding a migration to an app whose version stayed at
+1.1.0 and re-enabling it created the new index). Bump `<version>` in `info.xml` when you **ship**, because
+that is what makes an already-running instance apply the migration on upgrade.
+
 Guard the schema change with `hasTable()` so re-running the step is harmless, and add an index on every
-column you filter by.
+column you filter by. Index and table names are limited to 30 characters including the `oc_` prefix, so long
+app ids force abbreviations; pick names that survive a global search-and-replace when the app is renamed.
 
 **The entity** extends `OCP\AppFramework\Db\Entity`. Column `user_id` becomes property `$userId` with
 generated `getUserId()`/`setUserId()`; declare those in `@method` annotations so tooling understands them,
 and call `addType()` in the constructor so values come back as `int` rather than numeric strings.
 
 **The mapper** extends `QBMapper` and builds queries with the query builder. Bind every value with
-`createNamedParameter()`; never concatenate user input into SQL.
+`createNamedParameter()`; never concatenate user input into SQL. The table name you pass to the mapper and
+create in the migration is **without** the `oc_` prefix (`minimal_php_app_items`); the server adds the
+configured prefix, so the real table is `oc_minimal_php_app_items`.
 
 **In the controller**, inject the current user as `private ?string $userId` (lowercase). `$UserId` still
 works but has been a deprecated alias since Nextcloud 26.
@@ -191,8 +225,8 @@ works but has been a deprecated alias since Nextcloud 26.
 Verify:
 
 ```bash
-# the table exists (adjust for your database)
-occ db:convert-type --help >/dev/null && echo "use your DB client to check oc_<appid>_<table>"
+# the table exists, with its columns and indexes, without needing a database client
+occ db:schema:export | grep -A20 "oc_<appid>_<table>"
 # create and list through the API
 curl -u <user>:<pass> -H 'OCS-APIRequest: true' -H 'Content-Type: application/json' \
     -X POST "<nextcloud-url>/index.php/apps/<appid>/api/items" -d '{"title":"first item"}'
@@ -204,11 +238,16 @@ controller's validation runs.
 
 If it fails:
 
-- **Table missing**: the app version was not bumped, so no migration ran. Check `occ app:list` shows the new
-  version.
+- **Table missing**: you did not re-enable the app after adding the migration. Run
+  `occ app:disable <appid> && occ app:enable <appid>`, then re-check `occ db:schema:export`.
 - **`Class not found`**: the migration's namespace must match `OCA\<Namespace>\Migration`.
-- **Column mapping surprises**: entity properties are camelCase of the snake_case column; a property with no
-  matching column is silently ignored on write.
+- **A property with no matching column** is silently ignored when writing.
+- **A column with no matching entity property is the opposite of silent**, and it is the one that actually
+  happens: you add a column in a migration and forget the entity. `select('*')` maps every column through a
+  setter, so **reads** throw `<propertyName> is not a valid attribute` and the route returns `500`, while
+  writes keep working. Add the property and its `addType()` in the same change as the migration.
+- `occ migrations:status <appid>` reports odd counters ("Executed Unavailable: 1", "New Migrations: 1") on a
+  perfectly healthy app; do not chase them. The schema export is the reliable check.
 
 ## Stage 4: settings
 
