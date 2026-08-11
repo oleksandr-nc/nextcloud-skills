@@ -19,7 +19,7 @@ Works against any docker-install HaRP daemon you control, including the developm
 apps (just edit and restart the process; see
 [exapp-development.md](../../exapp-development/references/exapp-development.md)).
 
-Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, on 2026-08-04.
+Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, on 2026-08-11.
 
 Throughout, `occ` means the Nextcloud server console; on a Docker install run it as
 `docker exec -u www-data <nextcloud-container> php occ <command>`, on snap `nextcloud.occ`, on bare-metal
