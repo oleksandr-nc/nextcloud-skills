@@ -39,10 +39,15 @@ Example against the environment the [nextcloud-dev-setup](../skills/nextcloud-de
 builds:
 
 ```bash
-NC_URL=http://nextcloud.local DAEMON=local-harp \
+NC_URL=http://nextcloud.local DAEMON=local-harp HARP_CONTAINER=master-appapi-harp-1 \
 NC_ADMIN=admin NC_ADMIN_PASS=admin \
 python3 tests/verify.py --all --include-slow
 ```
+
+`HARP_CONTAINER` is not optional here. The default, `appapi-harp`, is the name the production
+Quickstart gives the container with `docker run --name`; the dev environment deliberately sets no
+`container_name`, so compose names it `master-appapi-harp-1`. Without the override every
+harp-operations check fails with `no such container: appapi-harp`.
 
 ## What it guarantees
 
