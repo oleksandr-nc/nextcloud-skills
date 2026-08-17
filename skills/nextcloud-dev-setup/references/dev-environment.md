@@ -45,6 +45,11 @@ Run all of this inside a disposable Linux VM (or an equivalent isolated box) tha
 
 Everything below assumes a shell inside that sandbox.
 
+**On a Mac** the stages below apply unchanged - that was verified end to end on Apple Silicon, including the
+default `DOMAIN_SUFFIX=.local`. Read [macos.md](macos.md) first anyway: it covers the Docker socket, which
+ExApp images exist for Apple Silicon, and the handful of macOS-only gotchas, so you do not spend time on
+adjustments that turn out to be unnecessary.
+
 ## Stage 1: clone and bootstrap
 
 Goal: nextcloud-docker-dev checked out, `.env` generated, Nextcloud server source and app_api cloned.
@@ -72,11 +77,16 @@ Verify:
 ```bash
 grep -E "COMPOSE_PROJECT_NAME|DOMAIN_SUFFIX|PROTOCOL" .env
 test -d workspace/server/apps-extra/app_api && echo app_api-cloned
-getent hosts nextcloud.local
+python3 -c "import socket; print(socket.gethostbyname('nextcloud.local'))"
 ```
 
 Expected: `COMPOSE_PROJECT_NAME=master`, `DOMAIN_SUFFIX=.local`, `PROTOCOL=http`; `app_api-cloned`;
-`nextcloud.local` resolving to localhost (getent may print the `::1` row, the `127.0.0.1` row, or both).
+`nextcloud.local` resolving to a loopback address (`127.0.0.1`). An unresolvable name raises
+`socket.gaierror`. (The resolution check is written in Python because `getent` does not exist on macOS.)
+
+Note that `bootstrap.sh` calls `scripts/update-hosts`, which needs `sudo` for every hostname it adds. Under
+`set -e` a refused `sudo` aborts the whole script before it clones anything, so run it where you can answer
+the password prompt.
 
 If it fails:
 - `nextcloud.local` does not resolve: re-run `./scripts/update-hosts` with sudo, or set up the dnsmasq wildcard.
@@ -149,7 +159,7 @@ services:
       HP_TRUSTED_PROXY_IPS: "192.168.21.0/24"   # DOCKER_SUBNET from .env
       HP_LOG_LEVEL: "info"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKER_SOCKET-/var/run/docker.sock}:/var/run/docker.sock
       - harp-certs:/certs
 
 volumes:

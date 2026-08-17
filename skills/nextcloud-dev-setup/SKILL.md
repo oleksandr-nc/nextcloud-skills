@@ -7,8 +7,9 @@ description: >-
   an environment for ExApp development, or repair a broken nextcloud-docker-dev setup.
 license: AGPL-3.0-or-later
 compatibility: >-
-  Linux with Docker Engine, docker compose v2, git, curl, make and sudo; 4+ vCPUs, 8+ GB RAM, 40+ GB disk
-  recommended. Last verified with Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3.
+  Linux or macOS with Docker Engine, docker compose v2, git, curl, make and sudo; 4+ vCPUs, 8+ GB RAM, 40+ GB
+  disk recommended. macOS runs the runbook unmodified; see references/macos.md. Last verified with Nextcloud
+  master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.4.
 ---
 
 # Nextcloud development environment setup
@@ -43,5 +44,9 @@ endpoints answer over `http://nextcloud.local/exapps/...`, the environment is do
 
 - [references/dev-environment.md](references/dev-environment.md): the full staged runbook (bring-up, daemons,
   smoke test, daily operation, reset and recovery, symptom-first troubleshooting).
+- [references/macos.md](references/macos.md): read first on a Mac. Verified end to end on Apple Silicon: what
+  genuinely differs, which ExApp images have arm64 builds, the Docker socket, and the adjustments you do *not*
+  need.
+- [assets/macos-preflight.sh](assets/macos-preflight.sh): checks a Mac and prints the `.env` lines to use.
 - Next steps: build your own ExApp with the [exapp-development](../exapp-development/SKILL.md) skill; operate
   a real instance with [exapp-operations](../exapp-operations/SKILL.md).

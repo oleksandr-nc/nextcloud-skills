@@ -202,7 +202,12 @@ def tasktypes_endpoint():
     _, out = run(["curl", "-s", "-u", f"{NC_ADMIN}:{NC_ADMIN_PASS}", "-H", "OCS-APIRequest: true",
                   f"{NC_URL}/ocs/v2.php/taskprocessing/tasktypes?format=json"], check=True)
     types = json.loads(out)["ocs"]["data"]["types"]
-    assert isinstance(types, dict), "unexpected payload shape"
+    # PHP serialises an empty associative array as [], so an instance with no providers
+    # answers "types": [] where one with providers answers an object. Both are valid.
+    assert isinstance(types, (dict, list)), f"unexpected payload shape: {type(types).__name__}"
+    if isinstance(types, list):
+        assert not types, f"a list payload is only valid when empty, got {len(types)} entries"
+        return "0 task types have a provider (none installed)"
     return f"{len(types)} task types have a provider"
 
 
