@@ -45,8 +45,9 @@ stage whose Verify block fails.
 - **Routes are deny-by-default.** Without `#[NoAdminRequired]` a route is admin-only, and every route needs a
   logged-in user unless it carries `#[PublicPage]`. An unauthenticated request to a working route answers
   `401`, not `404`: use that to tell "route missing" from "route protected".
-- `Util::addScript($appId, 'main')` looks for `js/main.mjs` first and falls back to `js/main.js`, so an app
-  can ship plain JavaScript and add a bundler later.
+- `Util::addScript($appId, $appId . '-main')` looks for `js/<appid>-main.mjs` first and falls back to
+  `js/<appid>-main.js`, so an app can ship plain JavaScript and adopt the Vite build later without touching
+  the PHP; the reference app does exactly that.
 - **Inline `<script>` is blocked** by the Content Security Policy. Behaviour goes in a file.
 - The app id, the `<namespace>` in `info.xml` and the `OCA\<Namespace>` PHP namespace must agree, or nothing
   autoloads.

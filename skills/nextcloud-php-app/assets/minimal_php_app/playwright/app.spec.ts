@@ -49,7 +49,7 @@ test('the app page renders its template', async ({ page }) => {
 test('the page script calls the API and renders the result', async ({ page }) => {
 	await page.goto('apps/minimal_php_app/')
 
-	// The placeholder is replaced only if js/main.js loaded, the CSP allowed it, and
+	// The placeholder is replaced only if the page script loaded, the CSP allowed it, and
 	// the API answered. Asserting the final text covers all three at once.
 	await expect(page.getByTestId('whoami-output')).toHaveText(`Signed in as ${USER} (${USER})`)
 })
