@@ -60,14 +60,17 @@ replace() {  # replace <from> <to> ; portable across GNU and BSD sed
     done
 }
 
+KEBAB=$(printf '%s' "$APP_ID" | tr '_' '-')
+
 echo "==> removing build artefacts and the reference README"
-rm -rf node_modules test-results playwright-report
-rm -f README.md rename.sh.renamebak
+rm -rf node_modules vendor build test-results playwright-report
+rm -f README.md rename.sh.renamebak composer.lock
 
 echo "==> renaming identifiers"
 replace 'minimal_php_app_items' "${SHORT}_items"      # table name, before the app id itself
 replace 'minimal_php_app_items_uid' "${SHORT}_items_uid"
 replace 'minimal_php_app' "$APP_ID"
+replace 'minimal-php-app' "$KEBAB"                     # CSS class names
 replace 'MinimalPhpApp' "$NAMESPACE"
 
 echo "==> renaming display strings"
@@ -83,6 +86,10 @@ NEW_MIGRATION="Version1000Date${STAMP}"
 mv "lib/Migration/${OLD_MIGRATION}.php" "lib/Migration/${NEW_MIGRATION}.php"
 replace "$OLD_MIGRATION" "$NEW_MIGRATION"
 [ -f playwright/app.spec.ts ] && mv playwright/app.spec.ts "playwright/${APP_ID}.spec.ts"
+# The page assets are named after the app id too (Util::addScript(APP_ID, APP_ID . '-main')).
+for f in js/minimal_php_app-main.js css/minimal_php_app-main.css; do
+    [ -f "$f" ] && mv "$f" "$(printf '%s' "$f" | sed "s|minimal_php_app|${APP_ID}|")"
+done
 
 echo "==> resetting the manifest for a new app"
 replace '<version>1.1.0</version>' '<version>1.0.0</version>'
@@ -95,7 +102,8 @@ replace 'Minimal Nextcloud PHP app used by the nextcloud-php-app skill' "$DISPLA
 
 echo "==> verifying that nothing of the reference app survived"
 leaks=$(grep -rniE 'minimal|MinimalPhp|min_php|nextcloud-php-app|AppAPI maintainers' . \
-    --exclude-dir=node_modules --exclude-dir=.git --exclude=rename.sh 2>/dev/null || true)
+    --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git \
+    --exclude=rename.sh --exclude=package-lock.json 2>/dev/null || true)
 if [ -n "$leaks" ]; then
     echo "FAIL: reference-app strings remain:" >&2
     printf '%s\n' "$leaks" >&2

@@ -27,6 +27,16 @@ test.beforeEach(async ({ page }) => {
 	await page.locator('#password').fill(PASSWORD)
 	await page.locator('button[type="submit"]').click()
 	await page.waitForURL(/apps|dashboard|files/)
+
+	// On a fresh instance the first-run wizard opens as a modal on every page until it
+	// is dismissed, and its overlay swallows the clicks meant for the app under test.
+	// Dismiss it the way its own close button does, once per user, before any page
+	// interaction; the request is harmless when the wizard is already gone or the
+	// app is disabled.
+	await page.evaluate(() => fetch(OC.generateUrl('/apps/firstrunwizard/wizard'), {
+		method: 'DELETE',
+		headers: { requesttoken: OC.requestToken },
+	}))
 })
 
 test('the app page renders its template', async ({ page }) => {
@@ -47,18 +57,23 @@ test('the page script calls the API and renders the result', async ({ page }) =>
 test('the app appears in the navigation', async ({ page }) => {
 	await page.goto('apps/dashboard/')
 
-	// The app menu is a popover: its entries are not in the DOM until it is opened,
-	// so a plain link query on the loaded page finds nothing even when the entry is
-	// registered correctly. Open it first, the way a user would.
+	// Nextcloud 34 and later render the app menu as a popover: its entries are not in
+	// the DOM until it is opened, so a plain query on the loaded page finds nothing even
+	// when the entry is registered correctly. Nextcloud 33 renders it inline in the header.
 	// exact: true matters here. The header carries two buttons whose accessible name
 	// starts with "Open apps menu" (the waffle and the current-app one), and a loose
 	// match resolves to both, which Playwright rejects under strict mode.
-	await page.getByRole('button', { name: 'Open apps menu', exact: true }).click()
+	const waffle = page.getByRole('button', { name: 'Open apps menu', exact: true })
+	if (await waffle.count() > 0) {
+		await waffle.click()
+	}
 
-	// The entries are anchors, but Nextcloud gives them role="menuitem", so querying
-	// for a link finds nothing. Always check the rendered role instead of assuming
-	// that <a> means link.
-	await expect(page.getByRole('menuitem', { name: 'Minimal PHP App' })).toBeVisible()
+	// The entries are anchors, but the popover gives them role="menuitem" (the inline
+	// menu on Nextcloud 33 keeps them as links), so querying for a link alone finds
+	// nothing on 34+. Always check the rendered role instead of assuming <a> means link.
+	const entry = page.getByRole('menuitem', { name: 'Minimal PHP App' })
+		.or(page.getByRole('link', { name: 'Minimal PHP App' }))
+	await expect(entry).toBeVisible()
 })
 
 test('the app produces no errors of its own', async ({ page }) => {
@@ -104,4 +119,18 @@ test('the data API stores and returns an item', async ({ page }) => {
 
 	expect(created.status).toBe(201)
 	expect(created.body.title).toBe(title)
+})
+
+test('adding an item through the page shows it in the list', async ({ page }) => {
+	await page.goto('apps/minimal_php_app/')
+	const title = `from the browser ${Date.now()}`
+
+	// The same test passes against the plain-JavaScript page and against the Vue build.
+	// Locating by accessible label and role (what a snapshot from a browser tool shows)
+	// is what makes that work: the plain <input aria-label> and the NcTextField component
+	// render different DOM but the same accessible name.
+	await page.getByLabel('New item').fill(title)
+	await page.getByRole('button', { name: 'Add' }).click()
+
+	await expect(page.getByTestId('item-list')).toContainText(title)
 })
