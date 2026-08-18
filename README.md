@@ -5,8 +5,9 @@
 
 # Nextcloud Skills
 
-Skills for AI agents working with **Nextcloud**: setting up development environments, building External Apps
-(ExApps) in any language, and operating or fixing them on real instances, development and production alike.
+Skills for AI agents working with **Nextcloud**: setting up development environments, building Nextcloud apps
+in PHP and External Apps (ExApps) in any language, and operating or fixing them on real instances, development
+and production alike.
 
 Three terms carry the whole repository: **AppAPI** is the Nextcloud component that runs ExApps (services
 living in their own containers next to Nextcloud), **HaRP** is AppAPI's recommended reverse-proxy deploy
@@ -27,6 +28,7 @@ frontmatter fields are used.
 | [exapp-operations](skills/exapp-operations/SKILL.md) | Install and operate AppAPI and ExApps with occ on Docker, Kubernetes, remote hosts or AIO, and troubleshoot symptom-first |
 | [harp-operations](skills/harp-operations/SKILL.md) | Run and debug HaRP itself: probes, configuration, log decoding, certificates, upgrades and load-related failures |
 | [nextcloud-ai-stack](skills/nextcloud-ai-stack/SKILL.md) | Install, verify and debug Nextcloud's AI features: Assistant, Task Processing and the provider apps behind them, local or external |
+| [nextcloud-php-app](skills/nextcloud-php-app/SKILL.md) | Build a Nextcloud **PHP app** from an empty directory to a release tarball: routes, templates, database, settings, a Vue frontend, PHPUnit and Psalm, packaging, and Playwright tests against a real instance |
 
 Every runbook was executed end to end against a live environment before being written down, and carries a
 "Last verified against" line naming the Nextcloud, AppAPI and HaRP versions it was checked with. The

@@ -12,8 +12,9 @@ running Nextcloud.
 Playwright is where Nextcloud is heading: the server ships `playwright.config.ts` next to its older Cypress
 setup, and apps including activity, circles, text, twofactor_totp and viewer already use it.
 
-Last verified against: Nextcloud master (35), Playwright 1.62.1, Node 22, on 2026-08-11 (6 tests, all
-passing against a live instance).
+Last verified against: Nextcloud master (35), 34.0.2 and 33.0.7, Playwright 1.62.1, Node 22, on 2026-08-18
+(7 tests, all passing against all three live instances, against the plain-JavaScript page and against the
+Vue build).
 
 ## Setup
 
@@ -120,6 +121,11 @@ test.beforeEach(async ({ page }) => {
     await page.locator('#password').fill(PASSWORD)
     await page.locator('button[type="submit"]').click()
     await page.waitForURL(/apps|dashboard|files/)
+    // dismiss the first-run wizard, see the traps below
+    await page.evaluate(() => fetch(OC.generateUrl('/apps/firstrunwizard/wizard'), {
+        method: 'DELETE',
+        headers: { requesttoken: OC.requestToken },
+    }))
 })
 ```
 
@@ -128,7 +134,7 @@ own suite does.
 
 ## The starter tests
 
-Six of them, in [playwright/app.spec.ts](../assets/minimal_php_app/playwright/app.spec.ts); each covers a
+Seven of them, in [playwright/app.spec.ts](../assets/minimal_php_app/playwright/app.spec.ts); each covers a
 failure the previous layer cannot see.
 
 1. **The template renders**: asserts the heading and static text. Catches a controller returning the wrong
@@ -157,25 +163,47 @@ failure the previous layer cannot see.
 
    This is the browser-side counterpart of the `OCS-APIRequest` header that `curl` needs: inside the page you
    already have a session, so you send the CSRF token instead.
+7. **The page's own form works**: types a title into the field, clicks the button, and expects the list to
+   show it. It locates by **accessible label and role** (`getByLabel('New item')`,
+   `getByRole('button', { name: 'Add' })`), not by `data-testid` or DOM shape, and that is what lets the same
+   test pass against the plain `<input aria-label>` and against the `NcTextField` component after the Vue
+   build. Accessible names are the stable contract; a browser tool's snapshot shows you exactly which ones a
+   page exposes.
 
-## Four traps that make a correct app look broken
+## Traps that make a correct app look broken
 
 Each of these cost a debugging round on a working app, so they are worth knowing before you write locators.
 
-**The app menu is a popover.** Its entries are not in the DOM until it is opened. A query for the app's link
-on a loaded page returns zero even when the entry is registered perfectly. Open the menu first.
+**The app menu is a popover on Nextcloud 34 and later.** Its entries are not in the DOM until it is opened. A
+query for the app's link on a loaded page returns zero even when the entry is registered perfectly. Open the
+menu first. On Nextcloud 33 there is nothing to open: the menu is rendered inline in the header, as
+`navigation "Applications menu"` with plain links, and no "Open apps menu" button exists.
 
-**Its entries are not links.** They are anchors with `role="menuitem"`, so `getByRole('link', ...)` matches
-nothing. Check the rendered role instead of assuming that `<a>` means link:
+**The popover's entries are not links.** They are anchors with `role="menuitem"`, so `getByRole('link', ...)`
+matches nothing on 34+ (on 33 they are links). Check the rendered role instead of assuming that `<a>` means
+link. The reference test handles both versions:
 
 ```ts
-await page.getByRole('button', { name: 'Open apps menu', exact: true }).click()
-await expect(page.getByRole('menuitem', { name: 'Minimal PHP App' })).toBeVisible()
+const waffle = page.getByRole('button', { name: 'Open apps menu', exact: true })
+if (await waffle.count() > 0) {          // 34+: popover; 33: inline navigation, no button
+    await waffle.click()
+}
+const entry = page.getByRole('menuitem', { name: 'Minimal PHP App' })
+    .or(page.getByRole('link', { name: 'Minimal PHP App' }))
+await expect(entry).toBeVisible()
 ```
 
 **`exact: true` is not optional there.** The header carries two buttons whose accessible name begins with
 "Open apps menu" (the waffle, and the current-app button), and Playwright's strict mode fails a locator that
 resolves to two elements.
+
+**The first-run wizard swallows clicks.** On an instance where the user has never dismissed it, the
+`firstrunwizard` app opens a modal on every page, and its overlay intercepts pointer events: Playwright reports
+`<div role="dialog" ... id="firstrunwizard"> subtree intercepts pointer events` and the click times out, while
+assertions that only read the page keep passing. Dismiss it the way its close button does, once per user, before
+interacting: `DELETE /index.php/apps/firstrunwizard/wizard` from inside the page (in the login helper above;
+harmless when the wizard is already gone or the app is disabled). The equivalent from the shell is
+`occ user:setting <user> firstrunwizard show <nextcloud-version>`.
 
 **Scope error assertions to your app.** A blanket "no console errors" assertion fails on a shared instance
 because some other app is unhealthy: ours failed on a 500 from the notifications API that had nothing to do

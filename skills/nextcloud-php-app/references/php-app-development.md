@@ -6,14 +6,17 @@
 # Building a Nextcloud PHP app
 
 A detailed runbook, part of the [nextcloud-php-app](../SKILL.md) skill. It starts from an empty directory and
-ends with an installed app serving a page, a JSON route and a navigation entry, each step proved by a command.
+ends with a released tarball: an installed app serving a page, a JSON route and a navigation entry, then
+data, settings, a Vue frontend, PHP tests, static analysis and packaging, each step proved by a command.
 
 The reference material for individual APIs (controllers, routing, dependency injection, events, background
 jobs, storage) is the
 [developer manual](https://docs.nextcloud.com/server/latest/developer_manual/); this runbook is the path
 through it, not a replacement for it.
 
-Last verified against: Nextcloud master (35), PHP 8.3, app installed from `apps-extra` on 2026-08-11.
+Last verified against: Nextcloud master (35), 34.0.2 and 33.0.7 with PHP 8.3, Node 22, Vite 7.3,
+@nextcloud/vue 9.9, PHPUnit 11.5, Psalm 6.16, app installed from `apps-extra` (and, on 33, from its own
+release tarball) on 2026-08-18.
 
 ## What an app is made of
 
@@ -23,8 +26,12 @@ Last verified against: Nextcloud master (35), PHP 8.3, app installed from `apps-
 | `lib/AppInfo/Application.php` | Bootstrap class; registers services and listeners |
 | `lib/Controller/` | Controllers; route attributes live on their methods |
 | `templates/` | Server-rendered pages returned by a `TemplateResponse` |
-| `js/`, `css/`, `img/` | Static assets served under `/apps/<appid>/` |
+| `js/`, `css/`, `img/` | Static assets served under `/apps/<appid>/`; `js/` and `css/` are the Vite build output once you build |
 | `lib/Migration/`, `lib/Db/` | Schema migrations and entities, once the app stores data |
+| `lib/Settings/` | Admin or personal settings section and form |
+| `src/`, `vite.config.js`, `package.json` | The Vue frontend and its build (Stage 5) |
+| `tests/`, `composer.json`, `psalm.xml`, `.php-cs-fixer.dist.php` | PHPUnit suites, static analysis, code style (Stage 6) |
+| `.nextcloudignore`, `krankerl.toml`, `Makefile` | What goes into the release tarball, and how to build it (Stage 7) |
 
 Three names must agree: the **app id** (`minimal_php_app`), the `<namespace>` in `info.xml`
 (`MinimalPhpApp`), and the PHP namespace (`OCA\MinimalPhpApp`). Classes under `lib/` autoload from that
@@ -130,13 +137,17 @@ do the work elsewhere.
 
 ### Templates and scripts
 
-A `TemplateResponse(APP_ID, 'index')` renders `templates/index.php` inside the Nextcloud page frame. Two rules
-decide most of what goes wrong:
+A `TemplateResponse(APP_ID, 'index')` renders `templates/index.php` inside the Nextcloud page frame. Three
+rules decide most of what goes wrong:
 
 - **Escape output** with `p()`, and translate with `$l->t()`.
 - **No inline `<script>`**: the Content Security Policy blocks it. Load a file with
-  `\OCP\Util::addScript(APP_ID, 'main')`, which resolves `js/main.mjs` first and falls back to `js/main.js`.
-  That fallback is what lets an app ship plain JavaScript and adopt a bundler later without changing the PHP.
+  `\OCP\Util::addScript(APP_ID, APP_ID . '-main')`, which resolves `js/<appid>-main.mjs` first and falls
+  back to `js/<appid>-main.js`; `\OCP\Util::addStyle(APP_ID, APP_ID . '-main')` loads
+  `css/<appid>-main.css`. Those are exactly the names the Vite build writes (Stage 5), so the same template
+  serves the plain-JavaScript stages and the built app.
+- **Wrap the page in `<div id="app-content">`**: that id is the server's hook for the white main panel and
+  its scrolling. Without it your markup renders straight onto the background image.
 
 In plain JavaScript the globals `OC.generateUrl()` and `OC.requestToken` are available, which is enough to
 call your own routes without any build tooling.
@@ -178,7 +189,8 @@ authentication problem and is not.
 
 Server-side checks cannot see a script that never loaded, a CSP violation, or a page that renders empty.
 Continue with [php-app-ui-testing.md](php-app-ui-testing.md), which sets up Playwright against a real
-instance. Add a test per stage from here on; the reference app's suite grows the same way.
+instance. Add a test per stage from here on; the reference app's suite grows the same way (seven tests by
+the end of this runbook), and it does not change when the frontend is swapped in Stage 5.
 
 ## Stage 3: store data
 
@@ -284,6 +296,187 @@ Personal settings work identically with `<personal>` and `<personal-section>`.
 
 Verify: open `<nextcloud-url>/index.php/settings/admin/<appid>`; the section appears in the left-hand list
 and the form renders. The reference app asserts exactly that in its Playwright suite.
+
+## Stage 5: a Vue frontend with Vite
+
+Plain JavaScript carries an app a long way, and it is the right way to start: nothing to install, nothing to
+build, and the page is already testable. Switch when the UI grows, or when you want the components users
+already know from Nextcloud (`@nextcloud/vue`: text fields, buttons, dialogs, the app frame). The reference
+app ships both frontends behind the same template and the same tests, so the switch is one command.
+
+What the switch consists of (all in the reference app):
+
+- `package.json`: `vue`, `@nextcloud/vue`, `@nextcloud/axios`, `@nextcloud/router`, `@nextcloud/l10n` as
+  dependencies; `vite`, `@nextcloud/vite-config`, **`typescript` and `@nextcloud/browserslist-config`** as
+  dev dependencies, plus `"browserslist": ["extends @nextcloud/browserslist-config"]`. The last two are not
+  optional even for a JavaScript-only app: `@nextcloud/vite-config` loads them at config time and fails
+  without them (`Cannot read properties of undefined (reading 'useCaseSensitiveFileNames')` for a missing
+  `typescript`, `Cannot find module '@nextcloud/browserslist-config'` for the other).
+- `vite.config.js`: `createAppConfig({ main: 'src/main.js' })` from `@nextcloud/vite-config`. One entry per
+  page script; the output name is `js/<appid>-<entry>.mjs`, with `<appid>` read from `appinfo/info.xml`,
+  and the entry's CSS goes to `css/<appid>-<entry>.css` (CSS is **not** inlined into the script by
+  default, which is why the template also calls `Util::addStyle`).
+- `src/main.js` mounts `src/App.vue` on the `<div id="<appid>">` the template already renders. `App.vue`
+  uses `NcTextField` and `NcButton` from `@nextcloud/vue/components/...`, `t()` from `@nextcloud/l10n`,
+  `generateUrl()` from `@nextcloud/router`, and `@nextcloud/axios`, which sends the CSRF token on every
+  request so the routes keep their protection.
+
+```bash
+npm ci               # about 300 MB of node_modules, once; needs Node 20.19+
+npm run build        # about a second; `npm run watch` rebuilds on change
+```
+
+**The build empties `js/` and `css/` first** (`emptyOutputDirectory`, with `css` added in the reference
+config), then writes the built files under the same names the plain files had. That is deliberate: the
+PHP does not change, `Util::addScript` now finds the `.mjs`, and the plain script is gone. There is no going
+back except through git, so if you want to keep the plain frontend, do not build.
+
+Two warnings are normal and can be ignored: `build.outDir must not be the same directory of root` (Nextcloud
+apps build into their own directory on purpose) and, when the app lives inside a server checkout, an esbuild
+note about the server's `tsconfig.json`, which the app's own `package.json` browserslist entry is there to
+neutralise (config lookup walks up the directory tree, and the server has both files).
+
+Verify:
+
+```bash
+ls js css                                     # <appid>-main.mjs, <appid>-main.css, a *.chunk.css
+PLAYWRIGHT_BASE_URL=<nextcloud-url> npm run playwright   # the same 7 tests pass unchanged
+```
+
+Then look at the page: the text field and button are the Nextcloud components. **Reload with the cache
+disabled** (hard reload, or a browser tool's reload with `ignoreCache`): the web server sends far-future
+cache headers for app assets, so a normal reload after a rebuild can show you the previous build. Playwright
+and the MCP browser tool open fresh contexts and are unaffected.
+
+If it fails:
+
+- **`npm run build` fails at config load** with one of the two errors quoted above: add the missing dev
+  dependency.
+- **The page still shows the old frontend**: cache; hard reload. If `ls js` shows only `.js`, the build did
+  not run.
+- **Components render unstyled** (no border on the field, text overflowing the button): `Util::addStyle` is
+  missing from the template, or its name does not match `css/<appid>-main.css`.
+- **The Playwright suite fails on the "adding an item" test only**: your locators are tied to the plain
+  DOM. Locate by accessible label and role (`getByLabel('New item')`, `getByRole('button', { name: 'Add' })`),
+  which the plain `<input aria-label>` and the `NcTextField` component both satisfy.
+
+Going further: when the whole page is Vue, shrink the template to a single empty `<div id="<appid>">` and let
+`NcContent` and `NcAppContent` from `@nextcloud/vue` draw the app frame; that is what shipped apps such as
+activity do (`templates/index.php` is one line, the layout lives in `src/views/`).
+
+## Stage 6: PHP tests, static analysis, code style
+
+The reference app carries two PHPUnit suites, and one bootstrap that serves both:
+
+- **`tests/unit/`**: plain `PHPUnit\Framework\TestCase`, dependencies mocked. `ItemControllerTest` builds
+  the controller by hand with a mocked mapper and asserts validation and response shapes. Runs anywhere.
+- **`tests/integration/`**: `\Test\TestCase` from the server checkout, real database.
+  `ItemMapperTest` gets the mapper from the container (`Server::get(ItemMapper::class)`), inserts rows for two
+  users, asserts the filter and that `addType()` gives back an `int`, and deletes what it created. It is
+  tagged `#[Group('DB')]` (the attribute; a `@group` docblock is a PHPUnit 11 deprecation).
+- **`tests/bootstrap.php`** looks for `../../../tests/bootstrap.php`. If the app sits inside a Nextcloud
+  checkout (`apps/`, `apps-extra/`, `custom_apps/`), it boots the server, so both suites can run. Otherwise
+  it loads `vendor/autoload.php`, which is enough for the unit suite because `composer.json` maps `OCP\` to
+  the `nextcloud/ocp` package in `autoload-dev` (that package ships no autoloader of its own; it exists for
+  static analysis).
+
+**Run inside the container**, as the web server user, and nothing needs installing: the
+nextcloud-docker-dev image ships `phpunit` (11.5, a phar in `/usr/local/bin`) and the server checkout
+provides `\Test\TestCase`:
+
+```bash
+docker exec -u www-data -w /var/www/html/apps-extra/<appid> <nextcloud-container> \
+    phpunit -c tests/phpunit.xml                    # both suites
+docker exec -u www-data -w /var/www/html/apps-extra/<appid> <nextcloud-container> \
+    phpunit -c tests/phpunit.xml --testsuite unit   # or: --filter ItemMapperTest
+```
+
+`www-data` is not a style choice: the server bootstrap reads `config/config.php`, and any other user is
+answered with `Cannot write into "config" directory!` or `Not installed`. Because that user cannot write
+into the mounted app directory, `tests/phpunit.xml` sets `cacheResult="false"`; without it every run ends
+with `Permission denied` on `.phpunit.result.cache`.
+
+**Static analysis and code style** need Composer dependencies. Install and run them in the container as
+**your own uid**, so `vendor/` belongs to you and the checks see the container's PHP (Psalm 6 refuses PHP
+below 8.3.16, which rules out the stock PHP of Ubuntu 24.04 on the host):
+
+```bash
+X="docker exec -u $(id -u):$(id -g) -w /var/www/html/apps-extra/<appid> <nextcloud-container>"
+$X composer install
+$X vendor/bin/psalm --no-cache                     # "No errors found!"
+$X vendor/bin/php-cs-fixer fix --dry-run --diff    # "Found 0 of N files that can be fixed"
+$X vendor/bin/php-cs-fixer fix                     # or apply the fixes
+```
+
+Standalone (the app in its own repository, no server around, PHP 8.3+ on the host): `composer install`, then
+`vendor/bin/phpunit -c tests/phpunit.xml --testsuite unit`. The integration suite is not runnable there;
+that is what CI does by checking out the server first, the way every app in the Nextcloud organisation
+does.
+
+Three things Psalm taught the reference app, worth knowing before it teaches you:
+
+- **A docblock line that starts with `@method` is parsed as a declaration.** A sentence in the class
+  comment that began "`@method` annotations are what ...", wrapped so that the tag started the line, made the
+  whole docblock invalid and every generated accessor "undefined". Keep the tag out of prose.
+- Psalm 6 wants `#[\Override]` on every implemented method and `final` on every class; the server and its
+  apps suppress both (`MissingOverrideAttribute`, `ClassMustBeFinal`), and so does `psalm.xml` here.
+- `phpVersion` in `psalm.xml` must be the **lowest** PHP you support, not the one you run: with `8.3` Psalm
+  demands typed class constants, which fatal on the PHP 8.2 that Nextcloud 33 and 34 still accept. The
+  reference declares `<php min-version="8.2"/>` in `info.xml`, `"php": ">=8.2"` in `composer.json` and
+  `phpVersion="8.2"` in `psalm.xml`, one fact in three places.
+
+Verify: `OK (4 tests, 15 assertions)` from the container run, `No errors found!` from Psalm, `Found 0 of N
+files that can be fixed` from php-cs-fixer, and `OK (3 tests, 11 assertions)` from a standalone unit run.
+
+If it fails:
+
+- **`Class "Test\TestCase" not found`**: the integration suite ran without a server checkout. Run it in
+  the container, or `--testsuite unit`.
+- **`Class "OCP\...\QBMapper" not found` in a standalone run**: `composer dump-autoload` after copying
+  `composer.json`; the `OCP\` mapping in `autoload-dev` is what provides it.
+- **`Not installed` or `Cannot write into "config" directory!`**: wrong user, see above.
+- **`Metadata found in doc-comment ... deprecated`**: a `@group` or `@dataProvider` docblock; use the
+  attribute.
+- **Psalm reports dozens of `UndefinedMagicMethod` on an entity**: the docblock trap above; check that no
+  prose line starts with `@method`.
+
+## Stage 7: package and release
+
+An app is released as a tarball whose top-level directory is the app id, containing only what runs:
+`appinfo/`, `lib/`, `templates/`, `img/`, `l10n/`, the **built** `js/` and `css/`. Sources, tests, tooling
+and `node_modules/` stay out. The reference app declares that list once, in `.nextcloudignore` (gitignore
+syntax), and offers two ways to apply it:
+
+- **`make appstore`**: validates `appinfo/info.xml` against the app store schema, runs `npm ci && npm run
+  build`, copies everything not ignored into `build/<appid>/` and writes
+  `build/artifacts/<appid>-<version>.tar.gz`. Needs `xmllint` (`libxml2-utils` on Debian and Ubuntu,
+  preinstalled on macOS), `rsync` and `tar`.
+- **`krankerl package`**, the community tool that reads the same `.nextcloudignore` and the `before_cmds`
+  in `krankerl.toml`.
+
+The manifest check is a real gate: after `rename.sh`, `<bugs>TODO your issue tracker</bugs>` fails it with
+`[facet 'pattern'] The value 'TODO your issue tracker' is not accepted by the pattern 'https?://.+'`, so a
+release cannot ship the placeholders.
+
+Verify, the way a user would install it:
+
+```bash
+make appstore
+tar -tzf build/artifacts/<appid>-<version>.tar.gz    # 14 runtime files for the reference app, no src/ tests/ vendor/
+# on another instance (or after moving the dev copy aside):
+tar -xzf build/artifacts/<appid>-<version>.tar.gz -C <apps-dir>
+occ app:enable <appid>
+```
+
+The reference app's tarball, extracted into a Nextcloud 33 instance, enabled and passed its full Playwright
+suite: that is the check that the ignore list did not drop anything the app needs at runtime.
+
+Before each release, bump `<version>` in `info.xml`: that is what makes running instances apply new
+migrations on upgrade (Stage 3), and the app store rejects a version it has seen. Publishing to the app
+store itself, signing the tarball with `occ integrity:sign-app` and the certificate you receive when the app
+is registered, and uploading it, is described in the
+[publishing guide](https://docs.nextcloud.com/server/latest/developer_manual/app_publishing_maintenance/publishing.html);
+it needs an app store account and was not part of this verification.
 
 ## Related
 

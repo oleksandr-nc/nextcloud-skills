@@ -12,21 +12,25 @@ shows every moving part. Copy it, rename it, and grow it.
 
 | Path | Shows |
 |---|---|
-| `appinfo/info.xml` | manifest, navigation entry, settings registration |
+| `appinfo/info.xml` | manifest, navigation entry, settings registration, PHP and Nextcloud version range |
 | `lib/AppInfo/Application.php` | the bootstrap class |
 | `lib/Controller/PageController.php` | a page and a JSON route, with attribute routing and access control |
 | `lib/Controller/ItemController.php` | a data API: list and create |
 | `lib/Db/Item.php`, `lib/Db/ItemMapper.php` | entity and query-builder data access |
 | `lib/Migration/Version1100Date20260811120000.php` | schema migration with an index |
 | `lib/Settings/` | admin section and settings form |
-| `templates/` | server-rendered pages |
-| `js/main.js` | page behaviour in plain JavaScript, no build step |
-| `playwright/app.spec.ts` | browser tests covering all of the above |
+| `templates/` | server-rendered pages; `index.php` loads `<appid>-main` script and style |
+| `js/minimal_php_app-main.js`, `css/minimal_php_app-main.css` | the page in plain JavaScript, no build step |
+| `src/main.js`, `src/App.vue`, `vite.config.js` | the same page in Vue with `@nextcloud/vue`; `npm run build` replaces the plain files |
+| `playwright/app.spec.ts` | 7 browser tests covering all of the above, passing against both frontends |
+| `tests/unit/`, `tests/integration/`, `tests/phpunit.xml` | PHPUnit: mocked controller test, real-database mapper test |
+| `composer.json`, `psalm.xml`, `.php-cs-fixer.dist.php` | dev dependencies, static analysis, code style |
+| `.nextcloudignore`, `krankerl.toml`, `Makefile` | release packaging (`make appstore`) |
 
 ## Install it
 
 ```bash
-cp -r minimal_php_app <apps-dir>/<your_app_id>     # apps-extra/ or custom_apps/
+cp -r minimal_php_app <apps-dir>/minimal_php_app     # apps-extra/ or custom_apps/
 occ app:enable minimal_php_app
 ```
 
@@ -50,6 +54,31 @@ PLAYWRIGHT_BASE_URL=<nextcloud-url> npm run playwright
 
 The suite logs in through the real form, so it needs a user; it defaults to `admin`/`admin` and reads
 `NEXTCLOUD_USER` / `NEXTCLOUD_PASSWORD` when set.
+
+## Build the Vue frontend
+
+```bash
+npm ci && npm run build          # writes js/minimal_php_app-main.mjs and css/, removing the plain files
+```
+
+The template does not change: `Util::addScript` picks the `.mjs` up. The Playwright suite passes unchanged.
+
+## Run the PHP tests and checks
+
+Inside the Nextcloud container (`<dir>` is the app directory as the container sees it, e.g.
+`/var/www/html/apps-extra/minimal_php_app`):
+
+```bash
+docker exec -u www-data -w <dir> <nextcloud-container> phpunit -c tests/phpunit.xml
+X="docker exec -u $(id -u):$(id -g) -w <dir> <nextcloud-container>"
+$X composer install && $X vendor/bin/psalm --no-cache && $X vendor/bin/php-cs-fixer fix --dry-run --diff
+```
+
+## Package it
+
+```bash
+make appstore                    # build/artifacts/minimal_php_app-<version>.tar.gz
+```
 
 ## Renaming it for your own app
 
