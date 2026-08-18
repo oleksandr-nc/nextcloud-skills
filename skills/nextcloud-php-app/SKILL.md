@@ -53,6 +53,9 @@ stage whose Verify block fails.
   autoloads.
 - **`curl` against your own routes needs `-H 'OCS-APIRequest: true'`**, otherwise even a GET is rejected with
   `412 CSRF check failed`, which looks like an auth problem and is not.
+- **The reference migration runs on the first `occ app:enable`.** Reshape it (and its entity, mapper and
+  controller) before enabling if your first table is different, or plan a second migration; the executed one
+  is frozen.
 - **Rename the reference app with its `rename.sh`, not by hand.** A migration's class name contains neither
   the app id nor the namespace, so hand renames fatal on install; display strings are a third set again.
 - Executed migrations are recorded in `oc_migrations` by `(app, version)`: **editing one does nothing**, for

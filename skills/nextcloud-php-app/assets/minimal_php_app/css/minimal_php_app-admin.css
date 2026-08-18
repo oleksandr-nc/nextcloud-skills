@@ -1,0 +1,18 @@
+/**
+ * SPDX-FileCopyrightText: 2026 Nextcloud GmbH and Nextcloud contributors
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Styles for the plain-JavaScript admin form; the Vite build writes a file of the same
+ * name from src/AdminSettings.vue.
+ */
+
+.minimal-php-app__form {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	max-width: 400px;
+}
+
+.minimal-php-app__form button {
+	flex-shrink: 0;
+}

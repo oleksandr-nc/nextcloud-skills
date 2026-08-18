@@ -145,8 +145,9 @@ failure the previous layer cannot see.
 3. **The navigation entry is reachable**: opens the app menu and finds the entry.
 4. **The app produces no errors of its own**: no uncaught exceptions, and no failing HTTP request belonging to
    this app.
-5. **The admin settings section renders**: proves the `ISettings` and section registration in `info.xml`
-   actually resolve, which nothing server-side tells you.
+5. **The admin settings section renders and saves**: proves the `ISettings` and section registration in
+   `info.xml` actually resolve, which nothing server-side tells you, then fills the field, saves, reloads and
+   expects the stored value back (and restores the default, so the test leaves no trace).
 6. **The data API stores a row**: performs an authenticated `POST` from inside the page with
    `page.evaluate()`, so the browser's own session and CSRF token are used:
 
@@ -196,6 +197,18 @@ await expect(entry).toBeVisible()
 **`exact: true` is not optional there.** The header carries two buttons whose accessible name begins with
 "Open apps menu" (the waffle, and the current-app button), and Playwright's strict mode fails a locator that
 resolves to two elements.
+
+**Some `@nextcloud/vue` inputs are not where their role is.** `NcCheckboxRadioSwitch` renders a visually
+hidden `<input type="checkbox">` under a label span, so `getByRole('checkbox', ...).click()` resolves the right
+element and then times out with `<span class="checkbox-content ..."> intercepts pointer events`. Click the
+visible label text (`row.getByText('Read', { exact: true }).click()`) or use `check({ force: true })`, and
+assert on the state with `toBeChecked()`. Text fields and buttons behave; toggles, checkboxes and radios are
+the ones to watch.
+
+**`fullyParallel: true` assumes state-free tests.** The reference config runs tests in parallel workers,
+which is safe only because no reference test changes something another one reads. As soon as a test edits
+shared state (an admin setting, the current user's list), either make it self-contained (unique data,
+restore in `finally`) or serialise the file with `test.describe.configure({ mode: 'serial' })`.
 
 **The first-run wizard swallows clicks.** On an instance where the user has never dismissed it, the
 `firstrunwizard` app opens a modal on every page, and its overlay intercepts pointer events: Playwright reports

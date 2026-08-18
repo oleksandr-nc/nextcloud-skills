@@ -95,11 +95,25 @@ test('the app produces no errors of its own', async ({ page }) => {
 	expect(errors).toEqual([])
 })
 
-test('the admin settings section renders', async ({ page }) => {
+test('the admin settings section renders and saves', async ({ page }) => {
 	await page.goto('settings/admin/minimal_php_app')
 
 	await expect(page.getByTestId('admin-section')).toBeVisible()
 	await expect(page.getByText('Admin settings rendered by an ISettings implementation.')).toBeVisible()
+
+	// The field is filled from initial state, the save goes through the admin-only PUT
+	// route, and a reload proves the value was stored, not just echoed. Restore the
+	// default afterwards so the test leaves no trace.
+	const greeting = `Hello ${Date.now()}`
+	await page.getByLabel('Greeting').fill(greeting)
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page.getByTestId('admin-status')).toHaveText(`Saved: ${greeting}`)
+	await page.reload()
+	await expect(page.getByLabel('Greeting')).toHaveValue(greeting)
+
+	await page.getByLabel('Greeting').fill('Hello')
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page.getByTestId('admin-status')).toHaveText('Saved: Hello')
 })
 
 test('the data API stores and returns an item', async ({ page }) => {

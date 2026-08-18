@@ -65,6 +65,14 @@ The script does all of it, then refuses to finish unless the result is clean: no
 anywhere, and every migration class name equal to its filename. It leaves three `TODO` markers in
 `appinfo/info.xml` (`<description>`, `<author>`, `<bugs>`) for you to fill in.
 
+**Decide about the reference table before the first enable.** The copy carries a migration that creates
+`<prefix>_items(id, user_id, title, created_at)`, the first `occ app:enable` runs it, and executed migrations
+are frozen from then on (Stage 3 explains the ledger). So if your app's first table is not that one, either
+reshape `lib/Migration/Version1000Date*.php`, `lib/Db/Item*.php` and `ItemController.php` **now**, following
+the rules in Stage 3, or accept that your own tables arrive in a second migration and drop the reference
+table there (`$schema->dropTable('<prefix>_items')`) once nothing uses it. Editing the reference migration
+after it ran changes nothing.
+
 Then enable it:
 
 ```bash
@@ -228,8 +236,17 @@ old table behind: nothing cleans it up for you.
 Guard every schema change so re-running the step is harmless, and match the guard to the change: `hasTable()`
 before creating a table, and `getTable(...)->hasColumn(...)` before adding a column to an existing one. A
 later migration that adds a column passes `hasTable()` trivially and would try to add the column twice. Add
-an index on every column you filter by. Index and table names are limited to 30 characters including the `oc_` prefix, so long
-app ids force abbreviations; pick names that survive a global search-and-replace when the app is renamed.
+an index on every column you filter by. Index and table names are limited to 30 characters including the
+`oc_` prefix, so long app ids force abbreviations; pick names that survive a global search-and-replace when
+the app is renamed.
+
+A column **added to an existing table** must be nullable or carry a real default: the server refuses a
+`NOT NULL` column whose default is the empty string with `Column "..." is NotNull, but has empty string or null
+as default.` (`MigrationService::ensureOracleConstraints`, because null and `''` are the same thing on
+Oracle), and the database itself refuses `NOT NULL` without a default when rows exist. Match the entity to
+that: a nullable column needs a nullable typed property (`protected ?string $url = null`), because the
+generated setter assigns the database value straight into the property and `null` into `string` is a
+`TypeError` at read time.
 
 **The entity** extends `OCP\AppFramework\Db\Entity`. Column `user_id` becomes property `$userId` with
 generated `getUserId()`/`setUserId()`; declare those in `@method` annotations so tooling understands them,
@@ -277,8 +294,8 @@ If it fails:
 
 ## Stage 4: settings
 
-Two classes and a template: a **section** (`IIconSection`) is the entry in the settings list, a **settings**
-class (`ISettings`) is the form inside it, and both are registered in `info.xml`:
+Two classes, a template, a script and a route. A **section** (`IIconSection`) is the entry in the settings
+list, a **settings** class (`ISettings`) is the form inside it, and both are registered in `info.xml`:
 
 ```xml
 <settings>
@@ -287,15 +304,36 @@ class (`ISettings`) is the form inside it, and both are registered in `info.xml`
 </settings>
 ```
 
-Pass values to the frontend with `IInitialState::provideInitialState()` rather than printing them into the
-template: the frontend reads them as parsed JSON, and nothing lands in the HTML. Store configuration with
-`IAppConfig` (`getValueString`, `setValueString`), which is the supported replacement for the old
-`IConfig::getAppValue` calls.
+The value makes a round trip, and the reference app shows every leg of it:
 
-Personal settings work identically with `<personal>` and `<personal-section>`.
+- **Out**: `AdminSettings::getForm()` reads it with `IAppConfig` (`getValueString`; `getValueInt`,
+  `getValueBool` and `getValueArray` exist for other types, all the supported replacement for the old
+  `IConfig::getAppValue`), hands it to the frontend with `IInitialState::provideInitialState()`, and loads the
+  form's script with `Util::addScript(APP_ID, APP_ID . '-admin')` (plus `Util::addStyle`). Nothing is
+  printed into `templates/admin.php`; the template is the empty form.
+- **In the browser**: the script reads it back with `OCP.InitialState.loadState(APP_ID, 'greeting')` in
+  plain JavaScript (`js/<appid>-admin.js`) or `loadState()` from `@nextcloud/initial-state` in Vue
+  (`src/AdminSettings.vue`, the second Vite entry of Stage 5). No GET route is needed for that.
+- **Back**: the save is a `PUT /api/settings` to `SettingsController::update()`, which carries **no**
+  `#[NoAdminRequired]`: deny-by-default makes it admin-only, and it writes with `setValueString`.
 
-Verify: open `<nextcloud-url>/index.php/settings/admin/<appid>`; the section appears in the left-hand list
-and the form renders. The reference app asserts exactly that in its Playwright suite.
+Personal settings work identically with `<personal>` and `<personal-section>` (and `IUserConfig` or
+`IConfig::getUserValue` for per-user values).
+
+Verify:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -H 'OCS-APIRequest: true' -H 'Content-Type: application/json' \
+    -X PUT "<nextcloud-url>/index.php/apps/<appid>/api/settings" -d '{"greeting":"x"}'          # 401
+curl -u <admin>:<pass> -H 'OCS-APIRequest: true' -H 'Content-Type: application/json' \
+    -X PUT "<nextcloud-url>/index.php/apps/<appid>/api/settings" -d '{"greeting":"Hey"}'        # {"greeting":"Hey"}
+occ config:app:get <appid> greeting                                                             # Hey
+```
+
+A non-admin user gets `403` on the same request. Then open `<nextcloud-url>/index.php/settings/admin/<appid>`:
+the section appears in the left-hand list, the field shows the stored value, and saving reports back. The
+reference app's fifth Playwright test does exactly that, including a reload to prove the value was stored
+rather than echoed.
 
 ## Stage 5: a Vue frontend with Vite
 
@@ -312,14 +350,18 @@ What the switch consists of (all in the reference app):
   optional even for a JavaScript-only app: `@nextcloud/vite-config` loads them at config time and fails
   without them (`Cannot read properties of undefined (reading 'useCaseSensitiveFileNames')` for a missing
   `typescript`, `Cannot find module '@nextcloud/browserslist-config'` for the other).
-- `vite.config.js`: `createAppConfig({ main: 'src/main.js' })` from `@nextcloud/vite-config`. One entry per
-  page script; the output name is `js/<appid>-<entry>.mjs`, with `<appid>` read from `appinfo/info.xml`,
-  and the entry's CSS goes to `css/<appid>-<entry>.css` (CSS is **not** inlined into the script by
-  default, which is why the template also calls `Util::addStyle`).
-- `src/main.js` mounts `src/App.vue` on the `<div id="<appid>">` the template already renders. `App.vue`
-  uses `NcTextField` and `NcButton` from `@nextcloud/vue/components/...`, `t()` from `@nextcloud/l10n`,
-  `generateUrl()` from `@nextcloud/router`, and `@nextcloud/axios`, which sends the CSRF token on every
-  request so the routes keep their protection.
+- `vite.config.js`: `createAppConfig({ main: 'src/main.js', admin: 'src/admin.js' })` from
+  `@nextcloud/vite-config`. **One entry per script Nextcloud loads**: the page and the admin form here, one
+  more for every further page, settings form or files-app plugin. The output name is
+  `js/<appid>-<entry>.mjs`, with `<appid>` read from `appinfo/info.xml`, and the entry's CSS goes to
+  `css/<appid>-<entry>.css` (CSS is **not** inlined into the script by default, which is why the PHP also
+  calls `Util::addStyle`; the entry CSS `@import`s the shared chunk CSS, so one `addStyle` per entry is
+  enough). Shared code lands in a `*.chunk.mjs` that the entries import.
+- `src/main.js` mounts `src/App.vue` on the `<div id="<appid>">` the template already renders;
+  `src/admin.js` mounts `src/AdminSettings.vue` on the admin form's wrapper. The components use
+  `NcTextField` and `NcButton` from `@nextcloud/vue/components/...`, `t()` from `@nextcloud/l10n`,
+  `generateUrl()` from `@nextcloud/router`, `loadState()` from `@nextcloud/initial-state`, and
+  `@nextcloud/axios`, which sends the CSRF token on every request so the routes keep their protection.
 
 ```bash
 npm ci               # about 300 MB of node_modules, once; needs Node 20.19+
@@ -330,6 +372,11 @@ npm run build        # about a second; `npm run watch` rebuilds on change
 config), then writes the built files under the same names the plain files had. That is deliberate: the
 PHP does not change, `Util::addScript` now finds the `.mjs`, and the plain script is gone. There is no going
 back except through git, so if you want to keep the plain frontend, do not build.
+
+If Vue is a given from the start, do not write the plain frontend twice: delete `js/*.js` and `css/*.css`
+after renaming, build the backend (Stages 3 and 4, verified with `curl`), then the Vue frontend, then write
+the Playwright suite once against the final page. The stage order above is the learning order, not a
+requirement; a fresh agent that did exactly this delivered a complete app in twelve minutes.
 
 Two warnings are normal and can be ignored: `build.outDir must not be the same directory of root` (Nextcloud
 apps build into their own directory on purpose) and, when the app lives inside a server checkout, an esbuild
@@ -425,8 +472,8 @@ Three things Psalm taught the reference app, worth knowing before it teaches you
   reference declares `<php min-version="8.2"/>` in `info.xml`, `"php": ">=8.2"` in `composer.json` and
   `phpVersion="8.2"` in `psalm.xml`, one fact in three places.
 
-Verify: `OK (4 tests, 15 assertions)` from the container run, `No errors found!` from Psalm, `Found 0 of N
-files that can be fixed` from php-cs-fixer, and `OK (3 tests, 11 assertions)` from a standalone unit run.
+Verify: `OK (6 tests, 23 assertions)` from the container run, `No errors found!` from Psalm, `Found 0 of N
+files that can be fixed` from php-cs-fixer, and `OK (5 tests, 19 assertions)` from a standalone unit run.
 
 If it fails:
 
@@ -443,8 +490,9 @@ If it fails:
 ## Stage 7: package and release
 
 An app is released as a tarball whose top-level directory is the app id, containing only what runs:
-`appinfo/`, `lib/`, `templates/`, `img/`, `l10n/`, the **built** `js/` and `css/`. Sources, tests, tooling
-and `node_modules/` stay out. The reference app declares that list once, in `.nextcloudignore` (gitignore
+`appinfo/`, `lib/`, `templates/`, `img/`, `l10n/`, the **built** `js/` and `css/` (source maps included, as
+the apps in the Nextcloud organisation ship them; add `/js/*.map` to the ignore list if you would rather
+not). Sources, tests, tooling and `node_modules/` stay out. The reference app declares that list once, in `.nextcloudignore` (gitignore
 syntax), and offers two ways to apply it:
 
 - **`make appstore`**: validates `appinfo/info.xml` against the app store schema, runs `npm ci && npm run
@@ -462,7 +510,7 @@ Verify, the way a user would install it:
 
 ```bash
 make appstore
-tar -tzf build/artifacts/<appid>-<version>.tar.gz    # 14 runtime files for the reference app, no src/ tests/ vendor/
+tar -tzf build/artifacts/<appid>-<version>.tar.gz    # reference app: 27 entries, no src/ tests/ vendor/ node_modules/
 # on another instance (or after moving the dev copy aside):
 tar -xzf build/artifacts/<appid>-<version>.tar.gz -C <apps-dir>
 occ app:enable <appid>

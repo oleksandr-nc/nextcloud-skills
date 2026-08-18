@@ -87,7 +87,7 @@ mv "lib/Migration/${OLD_MIGRATION}.php" "lib/Migration/${NEW_MIGRATION}.php"
 replace "$OLD_MIGRATION" "$NEW_MIGRATION"
 [ -f playwright/app.spec.ts ] && mv playwright/app.spec.ts "playwright/${APP_ID}.spec.ts"
 # The page assets are named after the app id too (Util::addScript(APP_ID, APP_ID . '-main')).
-for f in js/minimal_php_app-main.js css/minimal_php_app-main.css; do
+for f in js/minimal_php_app-main.js js/minimal_php_app-admin.js css/minimal_php_app-main.css css/minimal_php_app-admin.css; do
     [ -f "$f" ] && mv "$f" "$(printf '%s' "$f" | sed "s|minimal_php_app|${APP_ID}|")"
 done
 

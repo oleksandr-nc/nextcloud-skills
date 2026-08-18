@@ -16,14 +16,15 @@ shows every moving part. Copy it, rename it, and grow it.
 | `lib/AppInfo/Application.php` | the bootstrap class |
 | `lib/Controller/PageController.php` | a page and a JSON route, with attribute routing and access control |
 | `lib/Controller/ItemController.php` | a data API: list and create |
+| `lib/Controller/SettingsController.php` | an admin-only route that stores the admin setting |
 | `lib/Db/Item.php`, `lib/Db/ItemMapper.php` | entity and query-builder data access |
 | `lib/Migration/Version1100Date20260811120000.php` | schema migration with an index |
-| `lib/Settings/` | admin section and settings form |
+| `lib/Settings/` | admin section and settings form (initial state out, PUT route back) |
 | `templates/` | server-rendered pages; `index.php` loads `<appid>-main` script and style |
-| `js/minimal_php_app-main.js`, `css/minimal_php_app-main.css` | the page in plain JavaScript, no build step |
-| `src/main.js`, `src/App.vue`, `vite.config.js` | the same page in Vue with `@nextcloud/vue`; `npm run build` replaces the plain files |
+| `js/minimal_php_app-*.js`, `css/minimal_php_app-*.css` | the page and the admin form in plain JavaScript, no build step |
+| `src/`, `vite.config.js` | the same page and form in Vue with `@nextcloud/vue`, two Vite entries; `npm run build` replaces the plain files |
 | `playwright/app.spec.ts` | 7 browser tests covering all of the above, passing against both frontends |
-| `tests/unit/`, `tests/integration/`, `tests/phpunit.xml` | PHPUnit: mocked controller test, real-database mapper test |
+| `tests/unit/`, `tests/integration/`, `tests/phpunit.xml` | PHPUnit: mocked controller tests, real-database mapper test |
 | `composer.json`, `psalm.xml`, `.php-cs-fixer.dist.php` | dev dependencies, static analysis, code style |
 | `.nextcloudignore`, `krankerl.toml`, `Makefile` | release packaging (`make appstore`) |
 

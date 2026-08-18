@@ -22,6 +22,7 @@
     "type": "module",
     "dependencies": {
         "@nextcloud/axios": "^2.6.0",
+        "@nextcloud/initial-state": "^3.0.0",
         "@nextcloud/l10n": "^3.4.1",
         "@nextcloud/router": "^3.1.0",
         "@nextcloud/vue": "^9.9.0",
