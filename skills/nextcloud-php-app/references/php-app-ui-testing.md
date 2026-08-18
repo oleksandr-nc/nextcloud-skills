@@ -138,7 +138,8 @@ is admin-only) must create it, and a stock instance's password policy rejects sh
 user with a policy-compliant password from the environment and pass the same value to the suite:
 
 ```bash
-OC_PASS='Playwright-Second-User-2026!' occ user:add --password-from-env <uid>   # occ inside the container: docker exec -e OC_PASS=... -u www-data ...
+# in a container: docker exec -e OC_PASS='...' -u www-data <nextcloud-container> php occ user:add --password-from-env <uid>
+OC_PASS='Playwright-Second-User-2026!' occ user:add --password-from-env <uid>
 ```
 
 Do not assume a user exists on every instance; the reference suite reads `NEXTCLOUD_USER` and

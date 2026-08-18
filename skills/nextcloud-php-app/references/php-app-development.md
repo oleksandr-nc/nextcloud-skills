@@ -520,8 +520,8 @@ If it fails:
 An app is released as a tarball whose top-level directory is the app id, containing only what runs:
 `appinfo/`, `lib/`, `templates/`, `img/`, `l10n/`, the **built** `js/` and `css/` (source maps included, as
 the apps in the Nextcloud organisation ship them; add `/js/*.map` to the ignore list if you would rather
-not). Sources, tests, tooling and `node_modules/` stay out. The reference app declares that list once, in `.nextcloudignore` (gitignore
-syntax), and offers two ways to apply it:
+not). Sources, tests, tooling and `node_modules/` stay out. The reference app declares that list once, in
+`.nextcloudignore` (gitignore syntax), and offers two ways to apply it:
 
 - **`make appstore`**: validates `appinfo/info.xml` against the app store schema, runs `npm ci && npm run
   build`, copies everything not ignored into `build/<appid>/` and writes
