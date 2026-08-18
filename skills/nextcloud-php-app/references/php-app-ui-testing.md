@@ -132,6 +132,18 @@ test.beforeEach(async ({ page }) => {
 For a large suite, do this once in a `setup` project and reuse the saved `storageState`, the way the server's
 own suite does.
 
+Tests that need a **second, non-admin user** (to prove that users only see their own data, or that a route
+is admin-only) must create it, and a stock instance's password policy rejects short or common passwords
+(`Password is among the 1,000,000 most common ones ... needs to be at least 10 characters long`). Create the
+user with a policy-compliant password from the environment and pass the same value to the suite:
+
+```bash
+OC_PASS='Playwright-Second-User-2026!' occ user:add --password-from-env <uid>   # occ inside the container: docker exec -e OC_PASS=... -u www-data ...
+```
+
+Do not assume a user exists on every instance; the reference suite reads `NEXTCLOUD_USER` and
+`NEXTCLOUD_PASSWORD` for the same reason.
+
 ## The starter tests
 
 Seven of them, in [playwright/app.spec.ts](../assets/minimal_php_app/playwright/app.spec.ts); each covers a
@@ -208,7 +220,9 @@ the ones to watch.
 **`fullyParallel: true` assumes state-free tests.** The reference config runs tests in parallel workers,
 which is safe only because no reference test changes something another one reads. As soon as a test edits
 shared state (an admin setting, the current user's list), either make it self-contained (unique data,
-restore in `finally`) or serialise the file with `test.describe.configure({ mode: 'serial' })`.
+restore in `finally`), or run one worker (`workers: 1`, or `--workers 1`), or serialise the file with
+`test.describe.configure({ mode: 'serial' })`. Serial mode also **skips the rest of the file after the first
+failure** ("3 did not run"), which hides information while you are debugging; one worker does not.
 
 **The first-run wizard swallows clicks.** On an instance where the user has never dismissed it, the
 `firstrunwizard` app opens a modal on every page, and its overlay intercepts pointer events: Playwright reports

@@ -29,6 +29,7 @@ release tarball) on 2026-08-18.
 | `js/`, `css/`, `img/` | Static assets served under `/apps/<appid>/`; `js/` and `css/` are the Vite build output once you build |
 | `lib/Migration/`, `lib/Db/` | Schema migrations and entities, once the app stores data |
 | `lib/Settings/` | Admin or personal settings section and form |
+| `lib/Service/` | Logic shared by controllers, when it appears; any `lib/<Dir>/` autoloads as `OCA\<Namespace>\<Dir>` |
 | `src/`, `vite.config.js`, `package.json` | The Vue frontend and its build (Stage 5) |
 | `tests/`, `composer.json`, `psalm.xml`, `.php-cs-fixer.dist.php` | PHPUnit suites, static analysis, code style (Stage 6) |
 | `.nextcloudignore`, `krankerl.toml`, `Makefile` | What goes into the release tarball, and how to build it (Stage 7) |
@@ -95,8 +96,8 @@ curl -s -u <user>:<pass> -H 'OCS-APIRequest: true' \
     "<nextcloud-url>/ocs/v2.php/core/navigation/apps?format=json"
 ```
 
-Expected: `401` for the anonymous page request, `{"user":"<user>","displayName":"..."}` from the API, and your
-app id in the navigation list.
+Expected: `401` for the anonymous page request, `{"user":"<user>","displayName":"..."}` from the API (or
+whatever your own first JSON route answers, if you replaced `whoami`), and your app id in the navigation list.
 
 If it fails:
 
@@ -155,7 +156,9 @@ rules decide most of what goes wrong:
   `css/<appid>-main.css`. Those are exactly the names the Vite build writes (Stage 5), so the same template
   serves the plain-JavaScript stages and the built app.
 - **Wrap the page in `<div id="app-content">`**: that id is the server's hook for the white main panel and
-  its scrolling. Without it your markup renders straight onto the background image.
+  its scrolling. Without it your markup renders straight onto the background image. (A page that is entirely
+  Vue uses `NcContent` and `NcAppContent` instead, which draw that frame themselves; then the template is a
+  single empty `<div id="<appid>">` and no wrapper is needed. See the end of Stage 5.)
 
 In plain JavaScript the globals `OC.generateUrl()` and `OC.requestToken` are available, which is enough to
 call your own routes without any build tooling.
@@ -248,6 +251,12 @@ that: a nullable column needs a nullable typed property (`protected ?string $url
 generated setter assigns the database value straight into the property and `null` into `string` is a
 `TypeError` at read time.
 
+**Uniqueness** is a database job: `$table->addUniqueIndex(['user_id', 'note_date'], '<prefix>_notes_ud')`
+in the migration, and in the code that inserts, catch `OCP\DB\Exception` and check
+`$e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION` to turn the race into an
+update or a `409`; the reason code is what lets you tell it apart from any other database error, and it is
+what a unit test mocks. (`db:schema:export` prints `unique: true` under the index.)
+
 **The entity** extends `OCP\AppFramework\Db\Entity`. Column `user_id` becomes property `$userId` with
 generated `getUserId()`/`setUserId()`; declare those in `@method` annotations so tooling understands them,
 and call `addType()` in the constructor so values come back as `int` or `bool` rather than strings. Booleans
@@ -266,7 +275,8 @@ Verify:
 
 ```bash
 # the table exists, with its columns and indexes, without needing a database client.
-# The export prints ~13 lines per column, so ask for enough context to see them all.
+# The export prints ~13 lines per column, so ask for enough context to see them all;
+# add `| grep -E "name:|unique:|notnull:"` when you only want the shape at a glance.
 occ db:schema:export | grep -A60 "oc_<appid>_<table>"
 # create and list through the API
 curl -u <user>:<pass> -H 'OCS-APIRequest: true' -H 'Content-Type: application/json' \
@@ -374,9 +384,27 @@ PHP does not change, `Util::addScript` now finds the `.mjs`, and the plain scrip
 back except through git, so if you want to keep the plain frontend, do not build.
 
 If Vue is a given from the start, do not write the plain frontend twice: delete `js/*.js` and `css/*.css`
-after renaming, build the backend (Stages 3 and 4, verified with `curl`), then the Vue frontend, then write
-the Playwright suite once against the final page. The stage order above is the learning order, not a
-requirement; a fresh agent that did exactly this delivered a complete app in twelve minutes.
+after renaming (and then either ignore `js/` and `css/` entirely in `.gitignore` or commit the build output;
+the reference `.gitignore` tracks the plain files and ignores the built ones, which stops making sense once
+the plain files are gone), build the backend (Stages 3 and 4, verified with `curl`), then the Vue frontend,
+then write the Playwright suite once against the final page. The stage order above is the learning order,
+not a requirement; two fresh agents that did exactly this delivered complete apps in eleven and twelve
+minutes.
+
+The components' TypeScript declarations do not list their props (`DefineSetupFnComponent<Record<string,
+any>>`), so the reference and the two snippets below are the documentation an agent actually has:
+
+```vue
+<NcTextField v-model="title" :label="t(APP_ID, 'New item')" />           <!-- text input -->
+<NcCheckboxRadioSwitch v-model="teamVisible" type="switch"                <!-- on/off switch -->
+    @update:model-value="save">
+    {{ t(APP_ID, 'Notes are visible to the whole team') }}
+</NcCheckboxRadioSwitch>
+```
+
+`v-model` is the value, `type="switch"` makes a checkbox a switch, the slot is the label, and
+`@update:model-value` fires on change; import from `@nextcloud/vue/components/NcCheckboxRadioSwitch`. Full
+component list and props: https://nextcloud-vue-components.netlify.app/.
 
 Two warnings are normal and can be ignored: `build.outDir must not be the same directory of root` (Nextcloud
 apps build into their own directory on purpose) and, when the app lives inside a server checkout, an esbuild
