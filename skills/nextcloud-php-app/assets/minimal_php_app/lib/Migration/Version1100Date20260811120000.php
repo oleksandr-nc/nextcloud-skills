@@ -18,7 +18,8 @@ use OCP\Migration\SimpleMigrationStep;
 /**
  * Schema migration. The class name encodes the app version it belongs to and a
  * timestamp: Version<version-without-dots>Date<YmdHis>. Nextcloud runs pending
- * migrations when the installed app version changes.
+ * migrations when the app is enabled or upgraded, and remembers each executed step in
+ * oc_migrations, so editing an executed step does nothing: add a new file instead.
  *
  * Migrations must be idempotent: always guard with hasTable()/hasColumn(), because
  * the step can run again on a database that already has the change.

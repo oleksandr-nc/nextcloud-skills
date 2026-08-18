@@ -16,6 +16,7 @@ path = [
     "skills/nextcloud-php-app/SKILL.md",
     "skills/nextcloud-php-app/assets/minimal_php_app/package.json",
     "skills/nextcloud-php-app/assets/minimal_php_app/package-lock.json",
+    "skills/nextcloud-php-app/assets/minimal_php_app/composer.json",
     ".claude-plugin/marketplace.json",
     ".claude-plugin/plugin.json",
 ]

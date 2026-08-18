@@ -15,8 +15,10 @@ use OCP\AppFramework\Db\Entity;
  * One row of minimal_php_app_items.
  *
  * Entity maps snake_case columns to camelCase properties: user_id becomes $userId,
- * and the generated accessors are getUserId()/setUserId(). Declaring them in the
- * @method annotations is what makes static analysis and IDEs understand the class.
+ * and the generated accessors are getUserId()/setUserId(). Declaring them below (a
+ * docblock line starting with the method tag) is what makes static analysis and IDEs
+ * understand the class. Keep the tag out of prose in this comment: psalm parses every
+ * line that starts with it.
  *
  * @method string getUserId()
  * @method void setUserId(string $userId)
