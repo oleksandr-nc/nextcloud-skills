@@ -21,7 +21,7 @@ HaRP container, which the linting workflow does not have. CI validates structure
 python3 tests/verify.py --list                       # what exists
 python3 tests/verify.py --skill harp-operations      # one skill
 python3 tests/verify.py --all                        # every skill, fast checks only
-python3 tests/verify.py --all --include-slow         # also deploys the reference ExApp
+python3 tests/verify.py --all --include-slow         # also deploys the reference ExApp and PHP app
 ```
 
 Point it at your instance with environment variables:
@@ -34,6 +34,8 @@ Point it at your instance with environment variables:
 | `DAEMON` | `local-harp` | a `docker-install` HaRP daemon |
 | `HARP_CONTAINER` | `appapi-harp` | HaRP container name |
 | `NC_ADMIN`, `NC_ADMIN_PASS` | unset | admin credentials; without them the OCS checks skip |
+| `NC_APPS_DIR` | unset | host path of a directory on the instance's `apps_paths` (e.g. `workspace/server/apps-extra`); enables the slow nextcloud-php-app check |
+| `NC_APPS_DIR_IN_CONTAINER` | unset | the same directory as seen inside the container (e.g. `/var/www/html/apps-extra`); adds the PHPUnit run to that check |
 
 Example against the environment the [nextcloud-dev-setup](../skills/nextcloud-dev-setup/SKILL.md) skill
 builds:
@@ -52,8 +54,8 @@ harp-operations check fails with `no such container: appapi-harp`.
 ## What it guarantees
 
 - Checks only create their own throwaway objects and clean up in a `finally` block.
-- The slow check refuses to run when an app named `minimal_exapp` is already registered, so it can never
-  disturb a real installation.
+- The slow checks refuse to run when an app named `minimal_exapp` is already registered or a
+  `minimal_php_app` directory already exists, so they can never disturb a real installation.
 - Nothing else is modified: no daemon is unregistered, no existing app is touched, no data volume other than
   the reference app's own is removed.
 
