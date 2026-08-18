@@ -221,8 +221,7 @@ runs pending migrations immediately is re-enabling the app:
 occ app:disable <appid> && occ app:enable <appid>
 ```
 
-That works with or without a version bump (verified: adding a migration to an app whose version stayed at
-1.1.0 and re-enabling it created the new index). Bump `<version>` in `info.xml` when you **ship**, because
+That works with or without a version bump. Bump `<version>` in `info.xml` when you **ship**, because
 that is what makes an already-running instance apply the migration on upgrade.
 
 **Executed migrations are remembered, so editing one changes nothing.** Nextcloud records each step as
@@ -397,8 +396,7 @@ the reference `.gitignore` tracks the plain files and ignores the built `.mjs`, 
 built `css/<appid>-*.css` overwrite the tracked plain files of the same name, so `git status` shows them
 modified after a build), build the backend (Stages 3 and 4, verified with `curl`), then the Vue frontend,
 then write the Playwright suite once against the final page. The stage order above is the learning order,
-not a requirement; two fresh agents that did exactly this delivered complete apps in eleven and twelve
-minutes.
+not a requirement.
 
 Most components ship typed props in their `.vue.d.ts` (`NcButton`, `NcTextField`, ...); a few, among them
 `NcCheckboxRadioSwitch`, `NcActions` and `NcListItem`, are declared as
@@ -449,7 +447,7 @@ If it fails:
 Going further: when the whole page is Vue, shrink the template to a single empty `<div id="<appid>">` and let
 `NcContent` and `NcAppContent` from `@nextcloud/vue` draw the app frame; that is what shipped apps such as
 activity do (its `templates/app-main.php` is one empty `<div>`, and `src/views/ActivityApp.vue` opens with
-`NcContent`). The fourth agent round built its app that way from the start.
+`NcContent`).
 
 ## Stage 6: PHP tests, static analysis, code style
 
@@ -503,7 +501,7 @@ Standalone (the app in its own repository, no server around, PHP 8.3+ on the hos
 that is what CI does by checking out the server first, the way every app in the Nextcloud organisation
 does.
 
-Three things Psalm taught the reference app, worth knowing before it teaches you:
+Four Psalm behaviours worth knowing before they cost a round:
 
 - **A docblock line that starts with `@method` is parsed as a declaration.** A sentence in the class
   comment that began "`@method` annotations are what ...", wrapped so that the tag started the line, made the
@@ -573,7 +571,7 @@ migrations on upgrade (Stage 3), and the app store rejects a version it has seen
 store itself, signing the tarball with `occ integrity:sign-app` and the certificate you receive when the app
 is registered, and uploading it, is described in the
 [publishing guide](https://docs.nextcloud.com/server/latest/developer_manual/app_publishing_maintenance/publishing.html);
-it needs an app store account and was not part of this verification.
+it needs an app store account and is not covered here.
 
 ## Related
 

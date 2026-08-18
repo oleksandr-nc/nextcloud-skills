@@ -21,75 +21,53 @@ dependency injection. That makes it the right choice for UI, routes, settings, s
 wrong choice for anything long-running or written in another language, which belongs in an
 [ExApp](../exapp-development/SKILL.md).
 
-This skill goes from an empty directory to a release tarball, in seven stages that each end with a Verify
+This skill goes from an empty directory to a release tarball in seven stages, each ending with a Verify
 block: scaffold and install (1), prove it in a browser (2), store data (3), settings (4), a Vue frontend with
-Vite (5), PHP tests, Psalm and code style (6), package and release (7). Every stage was executed against live
-Nextcloud 33, 34 and 35 instances, and by fresh agents who had only this guide.
+Vite (5), PHP tests, Psalm and code style (6), package and release (7).
 
 ## How to work
 
 1. [references/php-app-development.md](references/php-app-development.md): what an app is made of, then the
-   seven stages, each installed and verified on a real instance.
+   seven stages.
 2. [assets/minimal_php_app/](assets/minimal_php_app/): the runnable reference app, already at Stage 7. Copy it
-   and run its `rename.sh`, rather than assembling files from memory; the plain-JavaScript page works without
-   any build, and `npm run build` swaps in the Vue frontend behind the same template and tests.
+   and run its `rename.sh`, rather than assembling files from memory. The plain-JavaScript page works without
+   any build; `npm run build` swaps in the Vue frontend behind the same template and tests.
 3. [references/php-app-ui-testing.md](references/php-app-ui-testing.md): Playwright against a real Nextcloud,
    including the locator traps that make correct apps look broken.
 
-Verify with commands after every change, in this order of cost: `curl` against the route, the PHPUnit suites
-in the container, the Playwright suite, and a look at the page through a browser tool. Do not move on from a
-stage whose Verify block fails.
+Verify with commands after every change, cheapest first: `curl` against the route, the PHPUnit suites in the
+container, the Playwright suite, a look at the page through a browser tool. Do not move on from a stage whose
+Verify block fails. If Vue is required from the start, skip the plain-JavaScript files and write the browser
+tests once against the final page; the runbook says how.
 
 ## Facts that save hours
 
-- **Routes are deny-by-default.** Without `#[NoAdminRequired]` a route is admin-only, and every route needs a
-  logged-in user unless it carries `#[PublicPage]`. An unauthenticated request to a working route answers
-  `401`, not `404`: use that to tell "route missing" from "route protected".
-- `Util::addScript($appId, $appId . '-main')` looks for `js/<appid>-main.mjs` first and falls back to
-  `js/<appid>-main.js`, so an app can ship plain JavaScript and adopt the Vite build later without touching
-  the PHP; the reference app does exactly that.
-- **Inline `<script>` is blocked** by the Content Security Policy. Behaviour goes in a file.
-- The app id, the `<namespace>` in `info.xml` and the `OCA\<Namespace>` PHP namespace must agree, or nothing
-  autoloads.
-- **`curl` against your own routes needs `-H 'OCS-APIRequest: true'`**, otherwise even a GET is rejected with
-  `412 CSRF check failed`, which looks like an auth problem and is not.
-- **The reference migration runs on the first `occ app:enable`.** Reshape it (and its entity, mapper and
-  controller) before enabling if your first table is different, or plan a second migration; the executed one
-  is frozen.
-- **Rename the reference app with its `rename.sh`, not by hand.** Identifiers live in file contents, file
-  names and a migration class name that contains neither the app id nor the namespace; a hand rename that
-  misses one fails on install (`Cannot declare class`, `Migration step '...' is unknown`), and display strings
-  are a third set again.
-- Executed migrations are recorded in `oc_migrations` by `(app, version)`: **editing one does nothing**, for
-  ever. Add a new file, or force it with `occ migrations:execute <appid> <version>`.
-- A new migration file runs when you **re-enable the app** (`occ app:disable X && occ app:enable X`),
-  with or without a version bump. Bump `<version>` for shipping, so running instances apply it on upgrade.
-- Inject the current user as `$userId` (lowercase); `$UserId` is a deprecated alias.
-- Nextcloud caches app metadata: after changing `info.xml`, disable and enable the app rather than wondering
-  why a navigation entry did not appear.
-- **`npm run build` empties `js/` and `css/`** (the reference Vite config asks for both) and writes `js/<appid>-<entry>.mjs` plus
-  `css/<appid>-<entry>.css` (the app id read from `info.xml`). CSS is not inlined into the script, so the
-  template needs `Util::addStyle` next to `Util::addScript`. `typescript` and `@nextcloud/browserslist-config`
-  are required dev dependencies even for a JavaScript-only app.
-- After a rebuild, **hard-reload**: app assets are served with far-future cache headers, so a plain reload can
-  show the previous build.
-- **PHPUnit runs in the Nextcloud container as `www-data`**, with the `phpunit` the dev image ships and the
-  server's own bootstrap; any other user fails with `Cannot write into "config" directory!`. Composer, Psalm
-  and php-cs-fixer run in the same container as **your** uid so `vendor/` stays yours.
-- **A docblock line starting with `@method` is a declaration** to Psalm; a wrapped sentence that begins with
-  the tag invalidates the whole entity docblock and every accessor becomes "undefined".
-- Target the **lowest** PHP you support (8.2 for Nextcloud 33 and 34) in `psalm.xml`, `info.xml` and
-  `composer.json`; Psalm on 8.3 asks for typed constants that fatal on 8.2.
-- Release = `make appstore`: schema-checks `info.xml` (fails on `rename.sh`'s `<bugs>` placeholder), builds,
-  and tars only what `.nextcloudignore` allows. Extract the tarball into another instance and enable it: that
-  is the proof.
-- In the browser, the app menu is a **popover** whose entries are anchors with `role="menuitem"` on Nextcloud
-  34 and later; on 33 it is inline in the header with plain links. Both facts silently break the obvious
-  Playwright locators.
-- **The first-run wizard modal swallows clicks** on a fresh instance: read-only assertions pass, clicks time
-  out. Dismiss it per user before interacting (`DELETE /apps/firstrunwizard/wizard`).
+- **Routes are deny-by-default.** Without `#[NoAdminRequired]` a route is admin-only; every route needs a
+  logged-in user unless it carries `#[PublicPage]`. Anonymous request to a working route: `401`, not `404`.
+- **`curl` against your own routes needs `-H 'OCS-APIRequest: true'`**, or even a GET is rejected with
+  `412 CSRF check failed`. Inside the page, `@nextcloud/axios` or a `requesttoken` header does the same.
+- The app id, `<namespace>` in `info.xml` and the `OCA\<Namespace>` PHP namespace must agree, or nothing
+  autoloads. **Rename the reference app with `rename.sh`, not by hand**; it validates and verifies itself.
+- **The reference migration runs on the first `occ app:enable`.** Reshape it before enabling if your first
+  table differs. Executed migrations are recorded in `oc_migrations` by `(app, version)`: editing one does
+  nothing; add a new file, and re-enable the app to run it (`occ app:disable X && occ app:enable X`).
+- A column added to an existing table must be nullable or have a real default; a nullable column needs a
+  nullable entity property. A column with no entity property makes reads `500` while writes keep working.
+- `Util::addScript($appId, $appId . '-main')` resolves `js/<appid>-main.mjs`, then `.js`; `Util::addStyle`
+  loads `css/<appid>-main.css`. Inline `<script>` is blocked by the CSP.
+- **`npm run build` empties `js/` and `css/`** and writes `<appid>-<entry>.mjs` and `.css` (id from
+  `info.xml`); CSS is not inlined into the script. `typescript` and `@nextcloud/browserslist-config` are
+  required dev dependencies. Hard-reload after a rebuild: app assets carry far-future cache headers.
+- **PHPUnit runs in the Nextcloud container as `www-data`** with the `phpunit` the dev image ships; any other
+  user fails with `Cannot write into "config" directory!`. Composer, Psalm and php-cs-fixer run there as
+  **your** uid. Target the lowest PHP and Nextcloud you support (8.2, `nextcloud/ocp` `dev-stable33`).
+- Release = `make appstore`: schema-checks `info.xml`, builds, tars only what `.nextcloudignore` allows.
+  Extract the tarball into another instance and enable it: that is the proof.
+- In the browser, the app menu is a **popover** with `role="menuitem"` entries on Nextcloud 34+, inline links
+  on 33; **the first-run wizard modal swallows clicks** on fresh instances; some `@nextcloud/vue` inputs
+  (`NcCheckboxRadioSwitch`) need their label clicked, not their role. Locate by accessible label and role.
 - Give the agent a real browser (an MCP browser server) before writing locators: the accessibility snapshot
-  hands you roles and accessible names directly, and the traps above become obvious.
+  hands you roles and accessible names directly.
 
 ## Files
 
@@ -97,7 +75,7 @@ stage whose Verify block fails.
   from scaffold to release, each with Verify and If-it-fails blocks.
 - [references/php-app-ui-testing.md](references/php-app-ui-testing.md): Playwright setup, the seven starter
   tests, debugging, and the locator traps.
-- [assets/minimal_php_app/](assets/minimal_php_app/): the reference app, including its Playwright and PHPUnit
+- [assets/minimal_php_app/](assets/minimal_php_app/): the reference app with its Playwright and PHPUnit
   suites, Vue frontend, Psalm and php-cs-fixer configuration and release Makefile. Its
-  [README](assets/minimal_php_app/README.md) lists what is where; read it before copying.
+  [README](assets/minimal_php_app/README.md) lists what is where.
 - A development instance to run all this against: [nextcloud-dev-setup](../nextcloud-dev-setup/SKILL.md).

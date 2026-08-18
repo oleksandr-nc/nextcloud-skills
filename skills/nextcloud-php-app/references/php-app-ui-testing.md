@@ -94,9 +94,8 @@ menu "Apps"
   menuitem "Minimal PHP App"
 ```
 
-That single snapshot answers the question that costs a debugging round otherwise: the app-menu entries are
-`menuitem`, not `link`. Every trap in the section below was discovered the slow way and would have been
-visible instantly here.
+That single snapshot answers a question that otherwise costs a debugging round: the app-menu entries are
+`menuitem`, not `link`. Every trap in the section below is visible instantly in such a snapshot.
 
 So the workflow is **explore live, then freeze**:
 
@@ -187,7 +186,7 @@ failure the previous layer cannot see.
 
 ## Traps that make a correct app look broken
 
-Each of these cost a debugging round on a working app, so they are worth knowing before you write locators.
+Each of these makes a working app fail its tests, so they are worth knowing before you write locators.
 
 **The app menu is a popover on Nextcloud 34 and later.** Its entries are not in the DOM until it is opened. A
 query for the app's link on a loaded page returns zero even when the entry is registered perfectly. Open the
