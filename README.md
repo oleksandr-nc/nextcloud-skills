@@ -31,7 +31,7 @@ frontmatter fields are used.
 | [nextcloud-php-app](skills/nextcloud-php-app/SKILL.md) | Build a Nextcloud **PHP app** from an empty directory to a release tarball: routes, templates, database, settings, a Vue frontend, PHPUnit and Psalm, packaging, and Playwright tests against a real instance |
 
 Every runbook was executed end to end against a live environment before being written down, and carries a
-"Last verified against" line naming the Nextcloud, AppAPI and HaRP versions it was checked with. The
+"Last verified against" line naming the Nextcloud version and the tools it was checked with. The
 load-bearing claims are also executable: [`tests/verify.py`](tests/README.md) replays them against a live
 instance, so a skill can be re-proven rather than re-read. The content is maintained alongside AppAPI and
 updated as AppAPI evolves.

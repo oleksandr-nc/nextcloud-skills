@@ -89,12 +89,14 @@ sh rename.sh <app_id> <Namespace> "<Display Name>"
 ```
 
 Do not do this by hand. The identifiers live in file contents, in file names, and in a migration **class
-name that contains neither the app id nor the namespace** - miss that one and `occ app:enable` fatals with
-`Cannot declare class ...`. Display strings ("Minimal PHP App", the summary, the author, the bugs URL) are a
-separate set again, and missing them gives you a working app called "Minimal PHP App" in the app menu.
+name that contains neither the app id nor the namespace**: miss a namespace line and `occ app:enable` fatals
+with `Cannot declare class ...`, rename the file without the class and it fails with `Migration step '...' is
+unknown`. Display strings ("Minimal PHP App", the summary, the author, the bugs URL) are a separate set
+again, and missing them gives you a working app called "Minimal PHP App" in the app menu.
 
-The script renames identifiers, display strings, the migration file and its class, the spec file and the
-table and index names (shortened to fit the 30-character limit), resets the version to 1.0.0, deletes this
-README and itself, and then **fails** unless the result is clean: no reference-app strings left, and every
-migration class name equal to its filename. It leaves `TODO` markers in `appinfo/info.xml` for
-`<description>`, `<author>` and `<bugs>`.
+The script validates its arguments first, then renames identifiers, CSS classes, display strings, the
+migration file and its class, the spec, script and stylesheet files and the table and index names, resets
+the version to 1.0.0, deletes this README and itself, and then **fails** unless the result is clean: no
+reference-app strings left, and every migration class name equal to its filename. It leaves `TODO` markers in
+`appinfo/info.xml` for `<description>`, `<author>` and `<bugs>`; the `<bugs>` one fails the app store schema
+check in `make appstore` until it is a URL.

@@ -57,10 +57,11 @@ sh rename.sh <app_id> <Namespace> "<Display Name>"
 
 Use the script rather than a search-and-replace of your own. Renaming this app by hand is the most
 error-prone step in the whole skill, because the identifiers live in three different places: file contents,
-file **names**, and a **PHP class name that contains neither the app id nor the namespace**. Miss that last
-one and `occ app:enable` dies with `Cannot declare class ... because the name is already in use`; miss the
-display strings and your app installs, works, and is called "Minimal PHP App" in the app menu, on its pages
-and in the settings list.
+file **names**, and a **PHP class name that contains neither the app id nor the namespace**. Miss a
+`namespace` line in one file and `occ app:enable` dies with `Cannot declare class ... because the name is
+already in use`; rename the migration file without its class (or the other way round) and it dies with
+`Migration step '...' is unknown`; miss the display strings and your app installs, works, and is called
+"Minimal PHP App" in the app menu, on its pages and in the settings list.
 
 The script does all of it, then refuses to finish unless the result is clean: no reference-app strings
 anywhere, and every migration class name equal to its filename. It leaves three `TODO` markers in
@@ -208,9 +209,10 @@ the end of this runbook), and it does not change when the frontend is swapped in
 Three pieces: a migration that creates the table, an entity that maps a row, and a mapper that queries it.
 See `lib/Migration/`, `lib/Db/` and `lib/Controller/ItemController.php` in the reference app.
 
-**The migration** is a class under `lib/Migration/` named `Version<n>Date<YmdHis>`, where `<n>` is a
-zero-padded encoding of the app version (`1.0.0` becomes `1000`, `1.1.0` becomes `1100`). Nextcloud only
-orders migrations lexically by that string; it never compares it to `<version>` in `info.xml`.
+**The migration** is a class under `lib/Migration/` named `Version<n>Date<YmdHis>`, where `<n>` is by
+convention an encoding of the app version (`1.0.0` becomes `1000`, `1.1.0` becomes `1100`). Nextcloud
+orders migrations by `<n>` as an integer, then by the date part; it never compares `<n>` to `<version>` in
+`info.xml`, so all it needs is that a newer migration sorts after the older ones.
 
 **A new migration file does not run by itself.** Loading a page or running `occ` will not pick it up. What
 runs pending migrations immediately is re-enabling the app:
@@ -227,21 +229,23 @@ that is what makes an already-running instance apply the migration on upgrade.
 `(app, version)` in the `oc_migrations` table and skips anything already recorded, no matter what the file
 now contains. Re-enabling the app reports success while your schema stays stale, which is a genuinely
 confusing failure while iterating on a first migration. Either give the change a **new file** with a
-lexically greater version string, or force the recorded one to run again:
+greater version number or later date, or force the recorded one to run again:
 
 ```bash
 occ migrations:execute <appid> <version>     # e.g. 1000Date20260811150000
 ```
 
-It prints nothing on success; confirm with the schema export below. Renaming a table this way also leaves the
-old table behind: nothing cleans it up for you.
+It prints nothing on success; confirm with the schema export below. Note that re-running a step guarded by
+`hasTable()` does nothing while the table exists, which is the guard doing its job: to recreate a table you
+would have to drop it first, and nothing in occ does that for you. Renaming a table this way also leaves the
+old table behind.
 
 Guard every schema change so re-running the step is harmless, and match the guard to the change: `hasTable()`
 before creating a table, and `getTable(...)->hasColumn(...)` before adding a column to an existing one. A
 later migration that adds a column passes `hasTable()` trivially and would try to add the column twice. Add
-an index on every column you filter by. Index and table names are limited to 30 characters including the
-`oc_` prefix, so long app ids force abbreviations; pick names that survive a global search-and-replace when
-the app is renamed.
+an index on every column you filter by. Table, column and index names are limited to 63 characters including
+the `oc_` prefix (`MigrationService::ensureNamingConstraints`); prefix them with the app id and pick names
+that survive a global search-and-replace when the app is renamed.
 
 A column **added to an existing table** must be nullable or carry a real default: the server refuses a
 `NOT NULL` column whose default is the empty string with `Column "..." is NotNull, but has empty string or null
@@ -354,12 +358,16 @@ app ships both frontends behind the same template and the same tests, so the swi
 
 What the switch consists of (all in the reference app):
 
-- `package.json`: `vue`, `@nextcloud/vue`, `@nextcloud/axios`, `@nextcloud/router`, `@nextcloud/l10n` as
-  dependencies; `vite`, `@nextcloud/vite-config`, **`typescript` and `@nextcloud/browserslist-config`** as
-  dev dependencies, plus `"browserslist": ["extends @nextcloud/browserslist-config"]`. The last two are not
-  optional even for a JavaScript-only app: `@nextcloud/vite-config` loads them at config time and fails
-  without them (`Cannot read properties of undefined (reading 'useCaseSensitiveFileNames')` for a missing
-  `typescript`, `Cannot find module '@nextcloud/browserslist-config'` for the other).
+- `package.json`: `vue`, `@nextcloud/vue`, `@nextcloud/axios`, `@nextcloud/router`, `@nextcloud/l10n`,
+  `@nextcloud/initial-state` as dependencies; `vite`, `@nextcloud/vite-config`, **`typescript` and
+  `@nextcloud/browserslist-config`** as dev dependencies, plus
+  `"browserslist": ["extends @nextcloud/browserslist-config"]`. `typescript` is required even for a
+  JavaScript-only app: `@nextcloud/vite-config` loads it at config time and fails without it
+  (`Cannot read properties of undefined (reading 'useCaseSensitiveFileNames')`). The browserslist entry is
+  what every Nextcloud app declares, and it must be paired with the package it extends, or the build fails
+  with `Cannot find module '@nextcloud/browserslist-config'`; without any entry, an app inside a server
+  checkout would silently inherit the server's browserslist configuration, since config lookup walks up
+  the directory tree.
 - `vite.config.js`: `createAppConfig({ main: 'src/main.js', admin: 'src/admin.js' })` from
   `@nextcloud/vite-config`. **One entry per script Nextcloud loads**: the page and the admin form here, one
   more for every further page, settings form or files-app plugin. The output name is
@@ -385,14 +393,17 @@ back except through git, so if you want to keep the plain frontend, do not build
 
 If Vue is a given from the start, do not write the plain frontend twice: delete `js/*.js` and `css/*.css`
 after renaming (and then either ignore `js/` and `css/` entirely in `.gitignore` or commit the build output;
-the reference `.gitignore` tracks the plain files and ignores the built ones, which stops making sense once
-the plain files are gone), build the backend (Stages 3 and 4, verified with `curl`), then the Vue frontend,
+the reference `.gitignore` tracks the plain files and ignores the built `.mjs`, maps and chunks, while the
+built `css/<appid>-*.css` overwrite the tracked plain files of the same name, so `git status` shows them
+modified after a build), build the backend (Stages 3 and 4, verified with `curl`), then the Vue frontend,
 then write the Playwright suite once against the final page. The stage order above is the learning order,
 not a requirement; two fresh agents that did exactly this delivered complete apps in eleven and twelve
 minutes.
 
-The components' TypeScript declarations do not list their props (`DefineSetupFnComponent<Record<string,
-any>>`), so the reference and the two snippets below are the documentation an agent actually has:
+Most components ship typed props in their `.vue.d.ts` (`NcButton`, `NcTextField`, ...); a few, among them
+`NcCheckboxRadioSwitch`, `NcActions` and `NcListItem`, are declared as
+`DefineSetupFnComponent<Record<string, any>>` and reveal nothing. For those, the reference and the snippets
+below are the documentation an agent actually has:
 
 ```vue
 <NcTextField v-model="title" :label="t(APP_ID, 'New item')" />           <!-- text input -->
@@ -408,8 +419,8 @@ component list and props: https://nextcloud-vue-components.netlify.app/.
 
 Two warnings are normal and can be ignored: `build.outDir must not be the same directory of root` (Nextcloud
 apps build into their own directory on purpose) and, when the app lives inside a server checkout, an esbuild
-note about the server's `tsconfig.json`, which the app's own `package.json` browserslist entry is there to
-neutralise (config lookup walks up the directory tree, and the server has both files).
+note about the server's `tsconfig.json` (the same walk-up: the app has no `tsconfig.json`, so the server's is
+found and its `extends` target is not installed in the app; harmless for a JavaScript app).
 
 Verify:
 
@@ -437,7 +448,8 @@ If it fails:
 
 Going further: when the whole page is Vue, shrink the template to a single empty `<div id="<appid>">` and let
 `NcContent` and `NcAppContent` from `@nextcloud/vue` draw the app frame; that is what shipped apps such as
-activity do (`templates/index.php` is one line, the layout lives in `src/views/`).
+activity do (its `templates/app-main.php` is one empty `<div>`, and `src/views/ActivityApp.vue` opens with
+`NcContent`). The fourth agent round built its app that way from the start.
 
 ## Stage 6: PHP tests, static analysis, code style
 
@@ -453,7 +465,9 @@ The reference app carries two PHPUnit suites, and one bootstrap that serves both
   checkout (`apps/`, `apps-extra/`, `custom_apps/`), it boots the server, so both suites can run. Otherwise
   it loads `vendor/autoload.php`, which is enough for the unit suite because `composer.json` maps `OCP\` to
   the `nextcloud/ocp` package in `autoload-dev` (that package ships no autoloader of its own; it exists for
-  static analysis).
+  static analysis). The package is pinned to `dev-stable33`, the **lowest** Nextcloud the app supports, so
+  Psalm and the unit tests see only the OCP surface that exists on every supported version; bump it together
+  with `min-version` in `info.xml`.
 
 **Run inside the container**, as the web server user, and nothing needs installing: the
 nextcloud-docker-dev image ships `phpunit` (11.5, a phar in `/usr/local/bin`) and the server checkout
@@ -472,8 +486,9 @@ into the mounted app directory, `tests/phpunit.xml` sets `cacheResult="false"`; 
 with `Permission denied` on `.phpunit.result.cache`.
 
 **Static analysis and code style** need Composer dependencies. Install and run them in the container as
-**your own uid**, so `vendor/` belongs to you and the checks see the container's PHP (Psalm 6 refuses PHP
-below 8.3.16, which rules out the stock PHP of Ubuntu 24.04 on the host):
+**your own uid**, so `vendor/` belongs to you and the checks see the container's PHP (Psalm 6 requires
+`~8.2.27 || ~8.3.16 || ~8.4.3 || ...`, so Composer refuses to install it on the stock PHP 8.3.6 of Ubuntu
+24.04 on the host):
 
 ```bash
 X="docker exec -u $(id -u):$(id -g) -w /var/www/html/apps-extra/<appid> <nextcloud-container>"
@@ -493,8 +508,13 @@ Three things Psalm taught the reference app, worth knowing before it teaches you
 - **A docblock line that starts with `@method` is parsed as a declaration.** A sentence in the class
   comment that began "`@method` annotations are what ...", wrapped so that the tag started the line, made the
   whole docblock invalid and every generated accessor "undefined". Keep the tag out of prose.
-- Psalm 6 wants `#[\Override]` on every implemented method and `final` on every class; the server and its
-  apps suppress both (`MissingOverrideAttribute`, `ClassMustBeFinal`), and so does `psalm.xml` here.
+- Psalm 6 wants `#[\Override]` on every implemented method and `final` on every class; most apps in the
+  Nextcloud organisation suppress both (`MissingOverrideAttribute`, `ClassMustBeFinal`), and so does
+  `psalm.xml` here.
+- With `nextcloud/ocp` at `dev-stable33`, Psalm reports `UndefinedDocblockClass` for `Doctrine\DBAL\Schema\Table`
+  and friends: the OCP of Nextcloud 33 still documents the schema methods with Doctrine types that an app
+  does not ship. `psalm.xml` suppresses exactly those three classes, the way apps in the Nextcloud
+  organisation do.
 - `phpVersion` in `psalm.xml` must be the **lowest** PHP you support, not the one you run: with `8.3` Psalm
   demands typed class constants, which fatal on the PHP 8.2 that Nextcloud 33 and 34 still accept. The
   reference declares `<php min-version="8.2"/>` in `info.xml`, `"php": ">=8.2"` in `composer.json` and
@@ -518,9 +538,10 @@ If it fails:
 ## Stage 7: package and release
 
 An app is released as a tarball whose top-level directory is the app id, containing only what runs:
-`appinfo/`, `lib/`, `templates/`, `img/`, `l10n/`, the **built** `js/` and `css/` (source maps included, as
-the apps in the Nextcloud organisation ship them; add `/js/*.map` to the ignore list if you would rather
-not). Sources, tests, tooling and `node_modules/` stay out. The reference app declares that list once, in
+`appinfo/`, `lib/`, `templates/`, `img/`, `l10n/`, the **built** `js/` and `css/` (source maps and the
+`.license` files the build writes included, as the apps in the Nextcloud organisation ship them; add
+`/js/*.map` to the ignore list if you would rather not). Sources, tests, tooling and `node_modules/` stay
+out. The reference app declares that list once, in
 `.nextcloudignore` (gitignore syntax), and offers two ways to apply it:
 
 - **`make appstore`**: validates `appinfo/info.xml` against the app store schema, runs `npm ci && npm run
@@ -538,7 +559,7 @@ Verify, the way a user would install it:
 
 ```bash
 make appstore
-tar -tzf build/artifacts/<appid>-<version>.tar.gz    # reference app: 27 entries, no src/ tests/ vendor/ node_modules/
+tar -tzf build/artifacts/<appid>-<version>.tar.gz    # only appinfo/ lib/ templates/ img/ js/ css/; no src/ tests/ vendor/ node_modules/
 # on another instance (or after moving the dev copy aside):
 tar -xzf build/artifacts/<appid>-<version>.tar.gz -C <apps-dir>
 occ app:enable <appid>

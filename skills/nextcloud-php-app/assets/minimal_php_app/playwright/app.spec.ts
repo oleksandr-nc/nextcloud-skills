@@ -50,8 +50,9 @@ test('the page script calls the API and renders the result', async ({ page }) =>
 	await page.goto('apps/minimal_php_app/')
 
 	// The placeholder is replaced only if the page script loaded, the CSP allowed it, and
-	// the API answered. Asserting the final text covers all three at once.
-	await expect(page.getByTestId('whoami-output')).toHaveText(`Signed in as ${USER} (${USER})`)
+	// the API answered. Asserting the final text covers all three at once. The display
+	// name may differ from the user id, so only the id in parentheses is asserted.
+	await expect(page.getByTestId('whoami-output')).toHaveText(new RegExp(`^Signed in as .+ \\(${USER}\\)$`))
 })
 
 test('the app appears in the navigation', async ({ page }) => {
@@ -117,8 +118,8 @@ test('the admin settings section renders and saves', async ({ page }) => {
 })
 
 test('the data API stores and returns an item', async ({ page }) => {
-	// request.post() from the page context reuses the session cookie, and Playwright
-	// sends the CSRF token that the browser already has.
+	// fetch() from inside the page reuses the session cookie, and the page's own CSRF
+	// token is sent as the requesttoken header, so the route keeps its protection.
 	const title = `playwright ${Date.now()}`
 	await page.goto('apps/minimal_php_app/')
 

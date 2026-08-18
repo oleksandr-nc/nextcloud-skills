@@ -49,12 +49,12 @@ export default defineConfig({
 
 ```bash
 npm install
-npm run playwright:install          # downloads the browser, about 115 MB, once
+npm run playwright:install          # downloads Chromium and its headless shell, about 300 MB, once
 PLAYWRIGHT_BASE_URL=<nextcloud-url> npm run playwright
 ```
 
-Both installs are one-time. `node_modules/` is not tracked in this repository, so a fresh clone always needs
-them; a copy taken from a checkout where the suite has already run may carry them along and start instantly.
+Both installs are one-time per copy: `node_modules/` is not tracked, and `rename.sh` removes it, so every
+new app starts with `npm install`.
 
 `OC` is a global that Nextcloud injects into the page, and it has no TypeScript declaration. Playwright
 transpiles specs without typechecking, so `OC.generateUrl(...)` runs fine either way, but add a declaration if
@@ -129,8 +129,9 @@ test.beforeEach(async ({ page }) => {
 })
 ```
 
-For a large suite, do this once in a `setup` project and reuse the saved `storageState`, the way the server's
-own suite does.
+For a large suite, log in once and reuse the saved `storageState` across tests (Playwright's own mechanism), or
+do what the server's suite does and log in through a fixture (`login()` from
+`@nextcloud/e2e-test-server/playwright`).
 
 Tests that need a **second, non-admin user** (to prove that users only see their own data, or that a route
 is admin-only) must create it, and a stock instance's password policy rejects short or common passwords

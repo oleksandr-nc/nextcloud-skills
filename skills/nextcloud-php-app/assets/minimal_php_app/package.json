@@ -1,6 +1,6 @@
 {
     "name": "minimal_php_app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Minimal Nextcloud PHP app used by the nextcloud-php-app skill",
     "license": "AGPL-3.0-or-later",
     "private": true,

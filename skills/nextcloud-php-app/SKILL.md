@@ -56,8 +56,10 @@ stage whose Verify block fails.
 - **The reference migration runs on the first `occ app:enable`.** Reshape it (and its entity, mapper and
   controller) before enabling if your first table is different, or plan a second migration; the executed one
   is frozen.
-- **Rename the reference app with its `rename.sh`, not by hand.** A migration's class name contains neither
-  the app id nor the namespace, so hand renames fatal on install; display strings are a third set again.
+- **Rename the reference app with its `rename.sh`, not by hand.** Identifiers live in file contents, file
+  names and a migration class name that contains neither the app id nor the namespace; a hand rename that
+  misses one fails on install (`Cannot declare class`, `Migration step '...' is unknown`), and display strings
+  are a third set again.
 - Executed migrations are recorded in `oc_migrations` by `(app, version)`: **editing one does nothing**, for
   ever. Add a new file, or force it with `occ migrations:execute <appid> <version>`.
 - A new migration file runs when you **re-enable the app** (`occ app:disable X && occ app:enable X`),
@@ -65,7 +67,7 @@ stage whose Verify block fails.
 - Inject the current user as `$userId` (lowercase); `$UserId` is a deprecated alias.
 - Nextcloud caches app metadata: after changing `info.xml`, disable and enable the app rather than wondering
   why a navigation entry did not appear.
-- **`npm run build` empties `js/` and `css/`** and writes `js/<appid>-<entry>.mjs` plus
+- **`npm run build` empties `js/` and `css/`** (the reference Vite config asks for both) and writes `js/<appid>-<entry>.mjs` plus
   `css/<appid>-<entry>.css` (the app id read from `info.xml`). CSS is not inlined into the script, so the
   template needs `Util::addStyle` next to `Util::addScript`. `typescript` and `@nextcloud/browserslist-config`
   are required dev dependencies even for a JavaScript-only app.
@@ -78,7 +80,7 @@ stage whose Verify block fails.
   the tag invalidates the whole entity docblock and every accessor becomes "undefined".
 - Target the **lowest** PHP you support (8.2 for Nextcloud 33 and 34) in `psalm.xml`, `info.xml` and
   `composer.json`; Psalm on 8.3 asks for typed constants that fatal on 8.2.
-- Release = `make appstore`: schema-checks `info.xml` (fails on `rename.sh`'s TODO placeholders), builds,
+- Release = `make appstore`: schema-checks `info.xml` (fails on `rename.sh`'s `<bugs>` placeholder), builds,
   and tars only what `.nextcloudignore` allows. Extract the tarball into another instance and enable it: that
   is the proof.
 - In the browser, the app menu is a **popover** whose entries are anchors with `role="menuitem"` on Nextcloud

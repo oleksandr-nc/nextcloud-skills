@@ -15,6 +15,7 @@ use Nextcloud\CodingStandard\Config;
 $config = new Config();
 $config
 	->getFinder()
+	->notPath('build')
 	->notPath('node_modules')
 	->notPath('vendor')
 	->in(__DIR__);

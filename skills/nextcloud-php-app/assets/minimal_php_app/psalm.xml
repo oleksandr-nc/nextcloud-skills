@@ -22,8 +22,16 @@
 	<extraFiles>
 		<directory name="vendor/nextcloud/ocp" />
 	</extraFiles>
-	<!-- Psalm 6 defaults that Nextcloud's own code base does not follow either. -->
 	<issueHandlers>
+		<!-- The OCP of Nextcloud 33 documents schema methods with Doctrine types the app does not ship. -->
+		<UndefinedDocblockClass>
+			<errorLevel type="suppress">
+				<referencedClass name="Doctrine\DBAL\Schema\Schema" />
+				<referencedClass name="Doctrine\DBAL\Schema\SchemaException" />
+				<referencedClass name="Doctrine\DBAL\Schema\Table" />
+			</errorLevel>
+		</UndefinedDocblockClass>
+		<!-- Psalm 6 defaults that most Nextcloud apps do not follow either. -->
 		<MissingOverrideAttribute errorLevel="suppress" />
 		<ClassMustBeFinal errorLevel="suppress" />
 		<!-- Entity::$id is set by the mapper, not by a constructor. -->

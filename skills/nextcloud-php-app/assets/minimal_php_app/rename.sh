@@ -7,7 +7,9 @@
 # Renaming this app by hand is the single most error-prone step in the whole skill:
 # the identifiers live in file contents, in file NAMES, and in a PHP class name that
 # shares neither the app id nor the namespace. Missing any one of them produces an app
-# that either fatals on `occ app:enable` or installs under the reference app's name.
+# that fails on `occ app:enable` (a missed namespace line: "Cannot declare class ...";
+# a class name that no longer matches its file: "Migration step '...' is unknown") or
+# installs under the reference app's name.
 #
 # Usage, from inside your copy:
 #   sh rename.sh <app_id> <Namespace> "<Display Name>"
@@ -29,9 +31,22 @@ APP_ID=$1
 NAMESPACE=$2
 DISPLAY_NAME=$3
 
+# Validate everything before touching a single file, so a rejected input leaves the
+# copy exactly as it was.
 case "$APP_ID" in
     *[!a-z0-9_]*) echo "app id must be lowercase letters, digits and underscores: $APP_ID" >&2; exit 2 ;;
 esac
+case "$NAMESPACE" in
+    [A-Z]*) ;;
+    *) echo "namespace must start with an uppercase letter: $NAMESPACE" >&2; exit 2 ;;
+esac
+case "$NAMESPACE" in
+    *[!A-Za-z0-9]*) echo "namespace must be letters and digits only: $NAMESPACE" >&2; exit 2 ;;
+esac
+if [ -z "$DISPLAY_NAME" ]; then
+    echo "display name must not be empty" >&2
+    exit 2
+fi
 
 if [ ! -f appinfo/info.xml ] || [ ! -d lib/AppInfo ]; then
     echo "run this from inside your copy of minimal_php_app" >&2
@@ -43,16 +58,25 @@ if [ "$APP_ID" = "minimal_php_app" ]; then
     exit 2
 fi
 
-# Table and index identifiers are capped at 30 characters including the oc_ prefix,
-# so derive a short prefix for them rather than using the app id blindly.
-SHORT=$(printf '%s' "$APP_ID" | cut -c1-12)
+# Table, column and index names are capped at 63 characters including the oc_ prefix
+# (MigrationService::ensureNamingConstraints), which is what a long app id runs into.
+if [ "$(printf 'oc_%s_items_uid' "$APP_ID" | wc -c)" -gt 63 ]; then
+    echo "app id too long: oc_${APP_ID}_items_uid exceeds 63 characters" >&2
+    exit 2
+fi
+
 STAMP=$(date -u +%Y%m%d%H%M%S)
 OLD_MIGRATION=Version1100Date20260811120000
 
-replace() {  # replace <from> <to> ; portable across GNU and BSD sed
+sed_escape() {  # make a string safe as the replacement part of s|from|to|
+    printf '%s' "$1" | sed 's/[&|\\]/\\&/g'
+}
+
+replace() {  # replace <from> <to> ; portable across GNU and BSD sed; never edits this script
     from=$1
-    to=$2
-    files=$(grep -rIl "$from" . --exclude-dir=node_modules --exclude-dir=.git 2>/dev/null || true)
+    to=$(sed_escape "$2")
+    files=$(grep -rIlF "$from" . --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git \
+        --exclude=rename.sh 2>/dev/null || true)
     [ -n "$files" ] || return 0
     printf '%s\n' "$files" | while IFS= read -r file; do
         sed -i.renamebak "s|${from}|${to}|g" "$file"
@@ -67,9 +91,7 @@ rm -rf node_modules vendor build test-results playwright-report
 rm -f README.md rename.sh.renamebak composer.lock
 
 echo "==> renaming identifiers"
-replace 'minimal_php_app_items' "${SHORT}_items"      # table name, before the app id itself
-replace 'minimal_php_app_items_uid' "${SHORT}_items_uid"
-replace 'minimal_php_app' "$APP_ID"
+replace 'minimal_php_app' "$APP_ID"                    # also renames the table and index: <appid>_items, <appid>_items_uid
 replace 'minimal-php-app' "$KEBAB"                     # CSS class names
 replace 'MinimalPhpApp' "$NAMESPACE"
 
@@ -93,6 +115,7 @@ done
 
 echo "==> resetting the manifest for a new app"
 replace '<version>1.1.0</version>' '<version>1.0.0</version>'
+replace '"version": "1.1.0"' '"version": "1.0.0"'
 replace 'Reference app for the nextcloud-php-app skill. It is the smallest app that still' "$DISPLAY_NAME."
 replace 'shows every moving part: an app id, a bootstrap class, a navigation entry, a page rendered from a template,' 'TODO: describe your app.'
 replace 'and a JSON API route. Copy it and grow it.' ''
@@ -101,7 +124,7 @@ replace '<bugs>https://github.com/oleksandr-nc/nextcloud-skills/issues</bugs>' '
 replace 'Minimal Nextcloud PHP app used by the nextcloud-php-app skill' "$DISPLAY_NAME"
 
 echo "==> verifying that nothing of the reference app survived"
-leaks=$(grep -rniE 'minimal|MinimalPhp|min_php|nextcloud-php-app|AppAPI maintainers' . \
+leaks=$(grep -rnE 'minimal_php_app|MinimalPhpApp|minimal-php-app|Minimal PHP App|nextcloud-php-app|AppAPI maintainers' . \
     --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git \
     --exclude=rename.sh --exclude=package-lock.json 2>/dev/null || true)
 if [ -n "$leaks" ]; then

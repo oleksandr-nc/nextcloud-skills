@@ -343,7 +343,7 @@ def reference_php_app_lifecycle():
     finally:
         occ(f"app:disable {PHP_APP_ID}")
         run(["rm", "-rf", str(target)])
-    return "; ".join(notes) + " (table oc_minimal_php_app_items is left behind, as for any removed app)"
+    return "; ".join(notes) + " (the app's table, appconfig and oc_migrations rows are left behind, as for any removed app)"
 
 
 CHECKS = {

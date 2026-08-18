@@ -57,7 +57,8 @@ harp-operations check fails with `no such container: appapi-harp`.
 - The slow checks refuse to run when an app named `minimal_exapp` is already registered or a
   `minimal_php_app` directory already exists, so they can never disturb a real installation.
 - Nothing else is modified: no daemon is unregistered, no existing app is touched, no data volume other than
-  the reference app's own is removed.
+  the reference app's own is removed. The PHP-app check disables and deletes its copy but, like any removed
+  Nextcloud app, leaves the table and config rows it created.
 
 A `SKIP` is not a pass. It means the precondition was absent (no credentials, no HaRP container, an app in
 the way); fix the precondition if you need the guarantee.

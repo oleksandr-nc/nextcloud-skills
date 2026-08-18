@@ -19,7 +19,7 @@ hosts and AIO have their own runbooks: [kubernetes.md](../../exapp-operations/re
 [aio.md](../../exapp-operations/references/aio.md).
 
 Last verified against: Nextcloud master (35), AppAPI 35.0.0-dev.1, HaRP 0.4.3, nextcloud-docker-dev df4ca69,
-on 2026-08-04; Stage 8 with chrome-devtools-mcp 1.7.0 on 2026-08-11.
+on 2026-08-04; Stage 8 with chrome-devtools-mcp 1.7.0 on 2026-08-18.
 
 ## If you are an AI agent, read this first
 
