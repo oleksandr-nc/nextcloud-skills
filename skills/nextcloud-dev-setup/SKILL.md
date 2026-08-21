@@ -43,7 +43,7 @@ endpoints answer over `http://nextcloud.local/exapps/...`, the environment is do
 ## Files
 
 - [references/dev-environment.md](references/dev-environment.md): the full staged runbook (bring-up, daemons,
-  smoke test, daily operation, reset and recovery, symptom-first troubleshooting).
+  smoke test, an optional browser for the agent, daily operation, reset and recovery, troubleshooting).
 - [references/macos.md](references/macos.md): read first on a Mac. Verified end to end on Apple Silicon: what
   genuinely differs, which ExApp images have arm64 builds, the Docker socket, and the adjustments you do *not*
   need.

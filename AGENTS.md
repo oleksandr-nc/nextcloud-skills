@@ -19,9 +19,11 @@ read its `SKILL.md` first; it tells you what to read next and the rules that mat
 | "Install AppAPI/HaRP on my server", "register a daemon (Docker/Kubernetes/remote host/AIO)", "manage or troubleshoot ExApps with occ" | [skills/exapp-operations/SKILL.md](skills/exapp-operations/SKILL.md) |
 | "HaRP returns 401/403/404/502/503", "ExApps unreachable although the containers run", "tune, upgrade or debug HaRP itself" | [skills/harp-operations/SKILL.md](skills/harp-operations/SKILL.md) |
 | "Set up AI on my Nextcloud", "the Assistant offers nothing", "my AI task never finishes", "which app provides which task type", "GPU or CPU" | [skills/nextcloud-ai-stack/SKILL.md](skills/nextcloud-ai-stack/SKILL.md) |
+| "Write a Nextcloud app in PHP", "add a page/route/table/settings to my app", "test my app's UI with Playwright", "package my app for the app store" | [skills/nextcloud-php-app/SKILL.md](skills/nextcloud-php-app/SKILL.md) |
 
-Building an ExApp but nothing is set up yet? Do [nextcloud-dev-setup](skills/nextcloud-dev-setup/SKILL.md)
-first; exapp-development assumes a working environment exists.
+Building an ExApp or a PHP app but nothing is set up yet? Do
+[nextcloud-dev-setup](skills/nextcloud-dev-setup/SKILL.md) first; exapp-development and nextcloud-php-app
+assume a working environment exists.
 
 Each skill's `SKILL.md` links the full runbooks in its `references/` directory; read the relevant runbook in
 full before executing it. Cross-skill links are relative, so keep the repository layout intact when copying

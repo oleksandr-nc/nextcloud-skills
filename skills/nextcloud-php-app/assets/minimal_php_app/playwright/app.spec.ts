@@ -1,0 +1,151 @@
+/**
+ * SPDX-FileCopyrightText: 2026 Nextcloud GmbH and Nextcloud contributors
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * UI tests for the minimal app. They drive a real browser against a real Nextcloud,
+ * which is the only way to catch what unit tests cannot: CSP violations, a script that
+ * never loads, a route that redirects to the login page, a broken navigation entry.
+ */
+
+import { expect, test } from '@playwright/test'
+
+// OC is a global Nextcloud injects into every page; it has no TypeScript declaration.
+// Playwright transpiles specs without typechecking, so this only matters if you run tsc.
+declare const OC: { generateUrl: (path: string) => string, requestToken: string }
+
+const USER = process.env.NEXTCLOUD_USER ?? 'admin'
+const PASSWORD = process.env.NEXTCLOUD_PASSWORD ?? 'admin'
+
+/**
+ * Log in through the real login form once per test file and keep the session in the
+ * browser context. Prefer this over faking cookies: it exercises the same path a user
+ * takes, and it breaks loudly when login itself regresses.
+ */
+test.beforeEach(async ({ page }) => {
+	await page.goto('login')
+	await page.locator('#user').fill(USER)
+	await page.locator('#password').fill(PASSWORD)
+	await page.locator('button[type="submit"]').click()
+	await page.waitForURL(/apps|dashboard|files/)
+
+	// On a fresh instance the first-run wizard opens as a modal on every page until it
+	// is dismissed, and its overlay swallows the clicks meant for the app under test.
+	// Dismiss it the way its own close button does, once per user, before any page
+	// interaction; the request is harmless when the wizard is already gone or the
+	// app is disabled.
+	await page.evaluate(() => fetch(OC.generateUrl('/apps/firstrunwizard/wizard'), {
+		method: 'DELETE',
+		headers: { requesttoken: OC.requestToken },
+	}))
+})
+
+test('the app page renders its template', async ({ page }) => {
+	await page.goto('apps/minimal_php_app/')
+
+	await expect(page.getByRole('heading', { name: 'Minimal PHP App' })).toBeVisible()
+	await expect(page.getByText('This page is rendered by a TemplateResponse.')).toBeVisible()
+})
+
+test('the page script calls the API and renders the result', async ({ page }) => {
+	await page.goto('apps/minimal_php_app/')
+
+	// The placeholder is replaced only if the page script loaded, the CSP allowed it, and
+	// the API answered. Asserting the final text covers all three at once. The display
+	// name may differ from the user id, so only the id in parentheses is asserted.
+	await expect(page.getByTestId('whoami-output')).toHaveText(new RegExp(`^Signed in as .+ \\(${USER}\\)$`))
+})
+
+test('the app appears in the navigation', async ({ page }) => {
+	await page.goto('apps/dashboard/')
+
+	// Nextcloud 34 and later render the app menu as a popover: its entries are not in
+	// the DOM until it is opened, so a plain query on the loaded page finds nothing even
+	// when the entry is registered correctly. Nextcloud 33 renders it inline in the header.
+	// exact: true matters here. The header carries two buttons whose accessible name
+	// starts with "Open apps menu" (the waffle and the current-app one), and a loose
+	// match resolves to both, which Playwright rejects under strict mode.
+	const waffle = page.getByRole('button', { name: 'Open apps menu', exact: true })
+	if (await waffle.count() > 0) {
+		await waffle.click()
+	}
+
+	// The entries are anchors, but the popover gives them role="menuitem" (the inline
+	// menu on Nextcloud 33 keeps them as links), so querying for a link alone finds
+	// nothing on 34+. Always check the rendered role instead of assuming <a> means link.
+	const entry = page.getByRole('menuitem', { name: 'Minimal PHP App' })
+		.or(page.getByRole('link', { name: 'Minimal PHP App' }))
+	await expect(entry).toBeVisible()
+})
+
+test('the app produces no errors of its own', async ({ page }) => {
+	const errors: string[] = []
+
+	// Uncaught exceptions from any script on the page are ours to care about.
+	page.on('pageerror', (error) => errors.push(`uncaught: ${error.message}`))
+	// For HTTP failures, filter to this app: a shared instance may have unrelated
+	// apps failing, and an unfiltered assertion turns their bugs into your flaky test.
+	page.on('response', (response) => {
+		if (response.status() >= 400 && response.url().includes('minimal_php_app')) {
+			errors.push(`${response.status()} ${response.url()}`)
+		}
+	})
+
+	await page.goto('apps/minimal_php_app/')
+	await expect(page.getByTestId('whoami-output')).not.toHaveText('Loading...')
+
+	expect(errors).toEqual([])
+})
+
+test('the admin settings section renders and saves', async ({ page }) => {
+	await page.goto('settings/admin/minimal_php_app')
+
+	await expect(page.getByTestId('admin-section')).toBeVisible()
+	await expect(page.getByText('Admin settings rendered by an ISettings implementation.')).toBeVisible()
+
+	// The field is filled from initial state, the save goes through the admin-only PUT
+	// route, and a reload proves the value was stored, not just echoed. Restore the
+	// default afterwards so the test leaves no trace.
+	const greeting = `Hello ${Date.now()}`
+	await page.getByLabel('Greeting').fill(greeting)
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page.getByTestId('admin-status')).toHaveText(`Saved: ${greeting}`)
+	await page.reload()
+	await expect(page.getByLabel('Greeting')).toHaveValue(greeting)
+
+	await page.getByLabel('Greeting').fill('Hello')
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page.getByTestId('admin-status')).toHaveText('Saved: Hello')
+})
+
+test('the data API stores and returns an item', async ({ page }) => {
+	// fetch() from inside the page reuses the session cookie, and the page's own CSRF
+	// token is sent as the requesttoken header, so the route keeps its protection.
+	const title = `playwright ${Date.now()}`
+	await page.goto('apps/minimal_php_app/')
+
+	const created = await page.evaluate(async (t) => {
+		const response = await fetch(OC.generateUrl('/apps/minimal_php_app/api/items'), {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', requesttoken: OC.requestToken },
+			body: JSON.stringify({ title: t }),
+		})
+		return { status: response.status, body: await response.json() }
+	}, title)
+
+	expect(created.status).toBe(201)
+	expect(created.body.title).toBe(title)
+})
+
+test('adding an item through the page shows it in the list', async ({ page }) => {
+	await page.goto('apps/minimal_php_app/')
+	const title = `from the browser ${Date.now()}`
+
+	// The same test passes against the plain-JavaScript page and against the Vue build.
+	// Locating by accessible label and role (what a snapshot from a browser tool shows)
+	// is what makes that work: the plain <input aria-label> and the NcTextField component
+	// render different DOM but the same accessible name.
+	await page.getByLabel('New item').fill(title)
+	await page.getByRole('button', { name: 'Add' }).click()
+
+	await expect(page.getByTestId('item-list')).toContainText(title)
+})

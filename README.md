@@ -5,8 +5,9 @@
 
 # Nextcloud Skills
 
-Skills for AI agents working with **Nextcloud**: setting up development environments, building External Apps
-(ExApps) in any language, and operating or fixing them on real instances, development and production alike.
+Skills for AI agents working with **Nextcloud**: setting up development environments, building Nextcloud apps
+in PHP and External Apps (ExApps) in any language, and operating or fixing them on real instances, development
+and production alike.
 
 Three terms carry the whole repository: **AppAPI** is the Nextcloud component that runs ExApps (services
 living in their own containers next to Nextcloud), **HaRP** is AppAPI's recommended reverse-proxy deploy
@@ -27,9 +28,10 @@ frontmatter fields are used.
 | [exapp-operations](skills/exapp-operations/SKILL.md) | Install and operate AppAPI and ExApps with occ on Docker, Kubernetes, remote hosts or AIO, and troubleshoot symptom-first |
 | [harp-operations](skills/harp-operations/SKILL.md) | Run and debug HaRP itself: probes, configuration, log decoding, certificates, upgrades and load-related failures |
 | [nextcloud-ai-stack](skills/nextcloud-ai-stack/SKILL.md) | Install, verify and debug Nextcloud's AI features: Assistant, Task Processing and the provider apps behind them, local or external |
+| [nextcloud-php-app](skills/nextcloud-php-app/SKILL.md) | Build a Nextcloud **PHP app** from an empty directory to a release tarball: routes, templates, database, settings, a Vue frontend, PHPUnit and Psalm, packaging, and Playwright tests against a real instance |
 
 Every runbook was executed end to end against a live environment before being written down, and carries a
-"Last verified against" line naming the Nextcloud, AppAPI and HaRP versions it was checked with. The
+"Last verified against" line naming the Nextcloud version and the tools it was checked with. The
 load-bearing claims are also executable: [`tests/verify.py`](tests/README.md) replays them against a live
 instance, so a skill can be re-proven rather than re-read. The content is maintained alongside AppAPI and
 updated as AppAPI evolves.
@@ -63,6 +65,14 @@ Clone the repository (or fetch single files raw from GitHub) and point your agen
 `skills/<name>/SKILL.md`. The files are self-contained markdown; no runtime or tooling is required to follow
 them. Tools that support the Agent Skills format natively can install the `skills/<name>` directories in
 their usual way.
+
+### Recommended: give your agent a browser
+
+Several skills verify user interfaces. An agent without a browser can only fetch HTML, which cannot show
+whether a script ran, whether the Content Security Policy blocked it, or what a component actually rendered.
+An MCP browser server (`chrome-devtools-mcp`, or `@playwright/mcp`) fixes that, and its accessibility
+snapshots hand you the roles and accessible names that test locators need. Setup, verified:
+[dev-environment.md, Stage 8](skills/nextcloud-dev-setup/references/dev-environment.md#stage-8-optional-give-the-agent-a-browser).
 
 ## Repository anatomy
 

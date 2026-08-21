@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Nextcloud GmbH and Nextcloud contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# krankerl (https://github.com/ChristophWurst/krankerl) packages the app for the app
+# store: it runs these commands, then archives everything not listed in
+# .nextcloudignore. `make appstore` does the same without krankerl.
+[package]
+before_cmds = [
+    "npm ci",
+    "npm run build",
+]

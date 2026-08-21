@@ -1,0 +1,24 @@
+/**
+ * SPDX-FileCopyrightText: 2026 Nextcloud GmbH and Nextcloud contributors
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Styles for the plain-JavaScript page. Util::addStyle() loads css/<appid>-main.css;
+ * the Vite build writes a file of the same name (and empties css/ first), so once you
+ * build, App.vue's <style> block replaces this file.
+ */
+
+.minimal-php-app {
+	padding: 0 20px;
+}
+
+.minimal-php-app__form {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	max-width: 400px;
+	margin-bottom: 12px;
+}
+
+.minimal-php-app__form button {
+	flex-shrink: 0;
+}

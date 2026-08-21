@@ -1,0 +1,32 @@
+{
+    "name": "nextcloud/minimal_php_app",
+    "description": "Minimal Nextcloud PHP app used by the nextcloud-php-app skill",
+    "license": "AGPL-3.0-or-later",
+    "type": "project",
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "nextcloud/coding-standard": "^1.4",
+        "nextcloud/ocp": "dev-stable33",
+        "phpunit/phpunit": "^11.5",
+        "vimeo/psalm": "^6.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "OCA\\MinimalPhpApp\\": "lib/",
+            "OCP\\": "vendor/nextcloud/ocp/OCP/"
+        }
+    },
+    "scripts": {
+        "cs:check": "php-cs-fixer fix --dry-run --diff",
+        "cs:fix": "php-cs-fixer fix",
+        "psalm": "psalm --no-cache",
+        "test:unit": "phpunit -c tests/phpunit.xml --testsuite unit",
+        "test:integration": "phpunit -c tests/phpunit.xml --testsuite integration"
+    }
+}

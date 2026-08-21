@@ -20,6 +20,10 @@ Configuration (environment):
     DAEMON          docker-install HaRP daemon name       (default: local-harp)
     HARP_CONTAINER  HaRP container name                   (default: appapi-harp)
     NC_ADMIN / NC_ADMIN_PASS   admin credentials for OCS checks (optional)
+    NC_APPS_DIR     host path of a directory on the instance's apps_paths (optional; enables the
+                    slow nextcloud-php-app check, e.g. workspace/server/apps-extra)
+    NC_APPS_DIR_IN_CONTAINER   the same directory as seen inside NC_CONTAINER (optional; adds the
+                    PHPUnit run to that check, e.g. /var/www/html/apps-extra)
 
 Checks never touch anything but their own throwaway objects, and clean up after themselves.
 """
@@ -37,6 +41,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 REF_APP = ROOT / "skills" / "exapp-development" / "assets" / "minimal_exapp"
 APP_ID = "minimal_exapp"
+REF_PHP_APP = ROOT / "skills" / "nextcloud-php-app" / "assets" / "minimal_php_app"
+PHP_APP_ID = "minimal_php_app"
 
 NC_CONTAINER = os.environ.get("NC_CONTAINER", "master-nextcloud-1")
 OCC = os.environ.get("OCC", f"docker exec -u www-data {NC_CONTAINER} php occ")
@@ -45,6 +51,8 @@ DAEMON = os.environ.get("DAEMON", "local-harp")
 HARP_CONTAINER = os.environ.get("HARP_CONTAINER", "appapi-harp")
 NC_ADMIN = os.environ.get("NC_ADMIN", "")
 NC_ADMIN_PASS = os.environ.get("NC_ADMIN_PASS", "")
+NC_APPS_DIR = os.environ.get("NC_APPS_DIR", "")
+NC_APPS_DIR_IN_CONTAINER = os.environ.get("NC_APPS_DIR_IN_CONTAINER", "")
 
 
 class Skip(Exception):
@@ -282,6 +290,62 @@ def reference_exapp_lifecycle():
     return "; ".join(notes)
 
 
+def reference_php_app_lifecycle():
+    """SLOW: install the reference PHP app from the assets and assert what the runbook promises."""
+    if not NC_APPS_DIR:
+        raise Skip("NC_APPS_DIR not set (host path of a directory on the instance's apps_paths)")
+    if not (NC_ADMIN and NC_ADMIN_PASS):
+        raise Skip("NC_ADMIN / NC_ADMIN_PASS not set")
+    target = Path(NC_APPS_DIR) / PHP_APP_ID
+    if target.exists():
+        raise Skip(f"{target} already exists; refusing to touch it")
+    _, listed = occ("app:list")
+    if f"- {PHP_APP_ID}:" in listed:
+        raise Skip(f"{PHP_APP_ID} is already installed here; refusing to touch it")
+
+    auth = f"-u {shlex.quote(NC_ADMIN)}:{shlex.quote(NC_ADMIN_PASS)} -H OCS-APIRequest:true"
+    base = f"{NC_URL}/index.php/apps/{PHP_APP_ID}"
+    notes = []
+    run(["rsync", "-a", "--exclude", "node_modules", "--exclude", "vendor", "--exclude", "build",
+         "--exclude", "test-results", "--exclude", "playwright-report",
+         f"{REF_PHP_APP}/", f"{target}/"], check=True)
+    try:
+        occ(f"app:enable {PHP_APP_ID}", check=True)
+        notes.append("enabled from a plain copy, no build step")
+
+        assert http_code(f"{base}/") == "401", "anonymous page request is not 401"
+        notes.append("protected route answers 401, not 404")
+
+        assert http_code(f"{base}/api/whoami", f"-u {shlex.quote(NC_ADMIN)}:{shlex.quote(NC_ADMIN_PASS)}") \
+            == "412", "GET without OCS-APIRequest is not 412"
+        _, who = run(f"curl -s --max-time 20 {auth} {base}/api/whoami", check=True)
+        assert json.loads(who)["user"] == NC_ADMIN, f"unexpected whoami: {who[:120]}"
+        notes.append("OCS-APIRequest header satisfies the CSRF check")
+
+        code = http_code(f"{base}/api/items", f"{auth} -H Content-Type:application/json "
+                         f"-X POST -d '{{\"title\":\"verify\"}}'")
+        assert code == "201", f"POST /api/items answered {code}"
+        _, items = run(f"curl -s --max-time 20 {auth} {base}/api/items", check=True)
+        assert any(i.get("title") == "verify" for i in json.loads(items)), "created item not listed"
+        notes.append("migration ran on enable, entity round-trips")
+
+        assert http_code(f"{NC_URL}/index.php/settings/admin/{PHP_APP_ID}",
+                         f"-u {shlex.quote(NC_ADMIN)}:{shlex.quote(NC_ADMIN_PASS)}") == "200", \
+            "admin settings page is not 200"
+        notes.append("admin settings section registered")
+
+        if NC_APPS_DIR_IN_CONTAINER:
+            code, out = run(["docker", "exec", "-u", "www-data", "-w",
+                             f"{NC_APPS_DIR_IN_CONTAINER}/{PHP_APP_ID}", NC_CONTAINER,
+                             "phpunit", "-c", "tests/phpunit.xml"], timeout=600)
+            assert code == 0 and "OK (" in out, f"phpunit failed: {out.strip()[-300:]}"
+            notes.append("phpunit unit + integration suites pass in the container")
+    finally:
+        occ(f"app:disable {PHP_APP_ID}")
+        run(["rm", "-rf", str(target)])
+    return "; ".join(notes) + " (the app's table, appconfig and oc_migrations rows are left behind, as for any removed app)"
+
+
 CHECKS = {
     "harp-operations": [harp_info, harp_healthy, harp_root_404, harp_unsigned_401,
                         harp_rewrites_aa_version],
@@ -290,8 +354,9 @@ CHECKS = {
     "nextcloud-ai-stack": [taskprocessing_surface, tasktypes_endpoint, cron_is_recent],
     "nextcloud-dev-setup": [public_exapps_path, harp_info],
     "exapp-development": [reference_exapp_lifecycle],
+    "nextcloud-php-app": [reference_php_app_lifecycle],
 }
-SLOW = {"reference_exapp_lifecycle"}
+SLOW = {"reference_exapp_lifecycle", "reference_php_app_lifecycle"}
 
 
 def main() -> int:

@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!--
+  - SPDX-FileCopyrightText: 2026 Nextcloud GmbH and Nextcloud contributors
+  - SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>minimal_php_app</id>
+	<name>Minimal PHP App</name>
+	<summary>Minimal Nextcloud PHP app: one page, one API route</summary>
+	<description><![CDATA[Reference app for the nextcloud-php-app skill. It is the smallest app that still
+shows every moving part: an app id, a bootstrap class, a navigation entry, a page rendered from a template,
+and a JSON API route. Copy it and grow it.]]></description>
+	<version>1.1.0</version>
+	<licence>agpl</licence>
+	<author>Nextcloud AppAPI maintainers</author>
+	<namespace>MinimalPhpApp</namespace>
+	<category>tools</category>
+	<bugs>https://github.com/oleksandr-nc/nextcloud-skills/issues</bugs>
+	<dependencies>
+		<php min-version="8.2"/>
+		<nextcloud min-version="33" max-version="35"/>
+	</dependencies>
+	<settings>
+		<admin>OCA\MinimalPhpApp\Settings\AdminSettings</admin>
+		<admin-section>OCA\MinimalPhpApp\Settings\AdminSection</admin-section>
+	</settings>
+	<navigations>
+		<navigation>
+			<id>minimal_php_app</id>
+			<name>Minimal PHP App</name>
+			<route>minimal_php_app.page.index</route>
+			<icon>app.svg</icon>
+			<order>80</order>
+		</navigation>
+	</navigations>
+</info>
